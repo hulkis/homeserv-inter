@@ -153,7 +153,7 @@ def convert_csv_to_parquet():
         test_data = prepare_data(intervention_test_df)
         for col in str_cols:
             test_data[col] = test_data[col].astype(str)
-        for col in numeric_cols:
+        for col in [x for x in numeric_cols if x != 'target']:
             test_data[col] = pd.to_numeric(test_data[col])
         test_data.to_parquet(
             DATA_DIR / "test.parquet.gzip", compression="gzip", engine="fastparquet"
