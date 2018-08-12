@@ -11,6 +11,34 @@ def to_datetimes(dt_cols, df):
 
 
 def convert_csv_to_parquet():
+    """Convert csv files into train.parquet.gzip & test.parquet.gzip.
+    Assumption:
+
+        ..code :: bash
+            ❯ tree data
+            data
+            ├── raw
+            │   ├── contract_history.csv
+            │   ├── data_description.xlsx
+            │   ├── equipment.csv
+            │   ├── intervention_history.csv
+            │   ├── intervention-life-cycle
+            │   │   ├── PROCESS_BI_CONTRATS_EN.ppt
+            │   │   └── PROCESS_BI_CONTRATS_FR.ppt
+            │   ├── intervention_test.csv
+            │   ├── intervention_train.csv
+            │   ├── nature-code
+            │   │   ├── nature_code_eau_chaude.csv
+            │   │   ├── nature_code_energie.csv
+            │   │   ├── nature_code_fonction.csv
+            │   │   ├── nature_code_installation.csv
+            │   │   └── nature_code_specification.csv
+            │   ├── organisation.csv
+            │   └── sample_submission.csv
+            └── read_and_join.ipynb
+
+            3 directories, 16 files
+"""
     with Timer("Reading organisation.csv", report_func=print):
         orga_df = pd.read_csv(
             RAW_DATA_DIR / "organisation.csv", sep="|", encoding="Latin-1"
@@ -29,8 +57,6 @@ def convert_csv_to_parquet():
         )
         dt_cols = ["CRE_DATE", "UPD_DATE", "DATE_RESILIATION", "DATE_DEBUT", "DATE_FIN"]
         contrat_history_df = to_datetimes(dt_cols, contrat_history_df)
-        # for c in ["CRE_DATE", "UPD_DATE"]:
-        #     contrat_history_df["{}_date".format(c)] = contrat_history_df[c].dt.date
 
     with Timer("Reading intervention_test.csv", report_func=print):
         intervention_test_df = pd.read_csv(
@@ -117,9 +143,7 @@ def convert_csv_to_parquet():
         train_data = prepare_data(intervention_train_df)
         for col in str_cols:
             train_data[col] = train_data[col].astype(str)
-            print('Converting into string column {}'.format(col))
         for col in numeric_cols:
-            print('Converting into numeric column {}'.format(col))
             train_data[col] = pd.to_numeric(train_data[col])
         train_data.to_parquet(
             DATA_DIR / "train.parquet.gzip", compression="gzip", engine="fastparquet"
@@ -128,10 +152,8 @@ def convert_csv_to_parquet():
     with Timer("Merging all test set", report_func=print):
         test_data = prepare_data(intervention_test_df)
         for col in str_cols:
-            print('Converting into string column {}'.format(col))
             test_data[col] = test_data[col].astype(str)
         for col in numeric_cols:
-            print('Converting into numeric column {}'.format(col))
             test_data[col] = pd.to_numeric(test_data[col])
         test_data.to_parquet(
             DATA_DIR / "test.parquet.gzip", compression="gzip", engine="fastparquet"
