@@ -27,3 +27,9 @@ Installation
 .. code:: bash
 
     pip install homeserv-inter
+
+
+Todo
+----
+
+hyperopt: https://www.kaggle.com/eikedehling/tune-and-compare-xgb-lightgbm-rf-with-hyperopt
