@@ -3,3 +3,5 @@ pyyaml
 fastparquet
 pandas
 #wax-toolbox
+fire
+lightgbm
