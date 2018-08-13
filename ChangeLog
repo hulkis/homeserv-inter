@@ -1,0 +1,10 @@
+CHANGES
+=======
+
+* [WIP] adding floydhub
+* Exploring datas
+* Begining to play
+* Fix for test.parquet conversion
+* Doc & delete print in convert\_raw\_datas
+* Convert csv into parquets
+* First commit thx to soft-cookiecutter
