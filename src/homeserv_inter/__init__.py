@@ -23,6 +23,7 @@ PKG_DIR = Path(__file__).parent.parent.parent
 SRC_DIR = Path(__file__).parent
 DATA_DIR = PKG_DIR / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
+CLEANED_DATA_DIR = DATA_DIR / "cleaned"
 
 numeric_cols = [
     "INSTANCE_ID",

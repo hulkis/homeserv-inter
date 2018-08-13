@@ -7,20 +7,41 @@ from homeserv_inter.datahandler import HomeServiceDataHandle
 from wax_toolbox import Timer
 
 warnings.filterwarnings(action="ignore", category=DeprecationWarning)
-params_best_fit = {
-    "task": "train",
-    "boosting_type": "gbdt",
-    "objective": "binary",
-    "metric": {"binary_logloss", "auc"},
-    # "learning_rate": 0.08,
-    # "max_depth": 30,
-    # "n_estimators": 300,
-    # "num_leaves": 1400,
-    # "feature_fraction": 0.9,
-    # "bagging_fraction": 0.8,
-    # "bagging_freq": 5,
-    "verbose": -1,
-}
+
+
+class LgbHomeService(HomeServiceDataHandle):
+    params_best_fit = {
+        # "task": "train",
+        "boosting_type": "gbdt",
+        "objective": "binary",
+        "metric": {"binary_logloss", "auc"},
+        # "learning_rate": 0.08,
+        # "max_depth": 30,
+        # "n_estimators": 300,
+        # "num_leaves": 1400,
+        # "feature_fraction": 0.9,
+        # "bagging_fraction": 0.8,
+        # "bagging_freq": 5,
+        "verbose": -1,
+        "nthreads": 4,
+    }
+
+    def validate(self, early_stopping_rounds=20):
+        dtrain, dtest = self.get_train_valid_set(as_lgb_dataset=True)
+        return lgb.train(
+            params=self.params_best_fit,
+            train_set=dtrain,
+            valid_sets=[dtest],
+            early_stopping_rounds=early_stopping_rounds,
+        )
+
+    def cv(self, nfolds=5, early_stopping_rounds=10):
+        dtrain = self.get_train_set(as_lgb_dataset=True)
+        return lgb.cv(
+            params=self.params_best_fit,
+            train_set=dtrain,
+            early_stopping_rounds=early_stopping_rounds,
+        )
 
 
 class HomeService(HomeServiceDataHandle):
@@ -55,10 +76,3 @@ class HomeService(HomeServiceDataHandle):
             )
 
         return rand_grid_search
-
-        # self.Xtrain, self.Xtest, self.ytrain, self.ytest = model_selection.train_test_split(
-        #     dftrain.drop(columns=["target"]),
-        #     dftrain[["target"]],
-        #     test_size=split_perc,
-        #     random_state=42,
-        # )

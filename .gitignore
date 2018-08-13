@@ -109,3 +109,4 @@ data/read_and_join.ipynb
 data/*.parquet.gzip
 *temp-plot.html
 data/floyddata
+data/cleaned
