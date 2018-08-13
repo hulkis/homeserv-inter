@@ -1,3 +1,13 @@
+.git
+.eggs
+eggs
+data/
+__pycache__/
+snapshots/
+submission/
+.*log
+runs/
+
 # Byte-compiled / optimized / DLL files
 .*__pycache__/
 *.py[cod]
@@ -108,4 +118,4 @@ data/raw/
 data/read_and_join.ipynb
 data/*.parquet.gzip
 *temp-plot.html
-data/floyddata
+

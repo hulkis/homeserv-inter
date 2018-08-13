@@ -1,0 +1,24 @@
+# see: https://docs.floydhub.com/floyd_config
+# All supported configs:
+
+machine: cpu
+env: tensorflow-1.8
+input:
+  - source: gjeusel/datasets/homeserv/2
+    destination: data
+
+description: this is a test
+max_runtime: 600  # in seconds
+
+command: "sh floyd_deps_installer.sh && homeserv model --debug False best_params_discovery"
+
+# You can also define multiple tasks to use with --task argument:
+#
+#task:
+#  evaluate:
+#    machine: gpu
+#    command: python evaluate.py
+#
+#  serve:
+#    machine: cpu
+#    mode: serve

@@ -1,8 +1,12 @@
+import warnings
+
 import lightgbm as lgb
-from homeserv_inter.datahandler import HomeServiceDataHandle
 from sklearn import metrics, model_selection
+
+from homeserv_inter.datahandler import HomeServiceDataHandle
 from wax_toolbox import Timer
 
+warnings.filterwarnings(action="ignore", category=DeprecationWarning)
 params_best_fit = {
     "task": "train",
     "boosting_type": "gbdt",
@@ -18,9 +22,9 @@ params_best_fit = {
     "verbose": -1,
 }
 
-class HomeService(HomeServiceDataHandle):
 
-    def _best_params_discovery(self):
+class HomeService(HomeServiceDataHandle):
+    def best_params_discovery(self):
         df, label_encoders = self._get_formatted_datas()
 
         param_dist = {
@@ -32,14 +36,19 @@ class HomeService(HomeServiceDataHandle):
         }
 
         model = lgb.LGBMClassifier(
-            silent=False, objective="binary", n_jobs=4, random_state=42,
-            verbose=-1,
+            silent=False, objective="binary", n_jobs=4, random_state=42, verbose=-1
         )
 
         # http://scikit-learn.org/stable/modules/generated/sklearn.model_selection.RandomizedSearchCV.html#sklearn.model_selection.RandomizedSearchCV
         with Timer("Randomized Search Cross Validation", True):
             rand_grid_search = model_selection.RandomizedSearchCV(
-                model, param_distributions=param_dist, n_iter=30
+                model,
+                param_distributions=param_dist,
+                n_iter=30,
+                scoring=["roc_auc", "accuracy"],
+                refit="roc_auc",
+                cv=5,
+                verbose=2,
             )
             rand_grid_search.fit(
                 df.drop(columns=["target"]), df[["target"]].values.ravel()

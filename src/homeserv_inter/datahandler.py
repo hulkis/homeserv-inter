@@ -5,6 +5,8 @@ from sklearn import preprocessing
 from homeserv_inter import DATA_DIR, label_cols, nlp_cols, timestamp_cols
 from wax_toolbox.profiling import Timer
 
+SEED = 42
+
 
 def datetime_features(df, col):
     idx = df[col].dt
@@ -65,15 +67,16 @@ class HomeServiceDataHandle:
     dftrain = None
     dftest = None
 
-    @classmethod
     def __init__(self, debug=True, mode="validation"):
         self.debug = debug
         self.mode = mode
 
-    def _get_formatted_datas(self, split_perc=0.2, as_lgb_dataset=True):
+    def _get_formatted_datas(self, split_perc=0.2, as_lgb_dataset=False):
         with Timer("Reading train set", report_func=print):
             if self.debug:
-                dftrain = pd.read_parquet(DATA_DIR / "train.parquet.gzip").head(1000)
+                dftrain = pd.read_parquet(DATA_DIR / "train.parquet.gzip").sample(
+                    n=100000, random_state=SEED,
+                )
                 dftrain = dftrain.dropna(axis=1, how="all")
             else:
                 dftrain = pd.read_parquet(DATA_DIR / "train.parquet.gzip")
@@ -86,3 +89,6 @@ class HomeServiceDataHandle:
 
         if as_lgb_dataset:
             return lgb.Dataset(data=df), label_encoders
+
+        else:
+            return df, label_encoders

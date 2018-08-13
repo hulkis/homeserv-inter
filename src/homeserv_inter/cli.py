@@ -3,6 +3,7 @@ import pandas as pd
 
 import fire
 from homeserv_inter import DATA_DIR, RAW_DATA_DIR, numeric_cols, str_cols
+from homeserv_inter.model import HomeService
 from wax_toolbox import Timer
 
 
@@ -165,5 +166,5 @@ def convert_csv_to_parquet(engine="pyarrow"):
         )
 
 
-if __name__ == "__main__":
-    fire.Fire({"convert-raw": convert_csv_to_parquet})
+def main():
+    return fire.Fire({"convert-raw": convert_csv_to_parquet, "model": HomeService})
