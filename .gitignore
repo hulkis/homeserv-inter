@@ -106,3 +106,6 @@ ENV/
 
 data/raw/
 data/read_and_join.ipynb
+data/*.parquet.gzip
+*temp-plot.html
+
