@@ -1,6 +1,7 @@
 import warnings
 
 import lightgbm as lgb
+import numpy as np
 import xgboost as xgb
 from hyperopt import hp, tpe
 from hyperopt.fmin import fmin
@@ -14,6 +15,19 @@ warnings.filterwarnings(action="ignore", category=DeprecationWarning)
 
 # Notes:
 # 3 times more of class 0 than class 1
+# Should look up https://arxiv.org/abs/1608.04802 for trying to optimize AUC
+
+
+# self-defined objective function
+# f(preds: array, train_data: Dataset) -> grad: array, hess: array
+# log likelihood loss
+def my_lgb_loglikelood(preds, train_data):
+    labels = train_data.get_label()
+    preds = 1. / (1. + np.exp(-preds))
+    grad = preds - labels
+    hess = preds * (1. - preds)
+    return grad, hess
+
 
 def my_lgb_roc_auc_score(y_pred, y_true):
     # Example custom objective & metric:
@@ -25,9 +39,12 @@ def my_lgb_roc_auc_score(y_pred, y_true):
     res = metrics.roc_auc_score(y_true=y_true.label, y_score=y_pred, average="macro")
     return "roc_auc_score", res, True
 
+
 def my_xgb_roc_auc_score(y_pred, y_true):
     # https://github.com/dmlc/xgboost/blob/master/demo/guide-python/custom_objective.py
-    res = metrics.roc_auc_score(y_true=y_true.get_label(), y_score=y_pred, average="macro")
+    res = metrics.roc_auc_score(
+        y_true=y_true.get_label(), y_score=y_pred, average="macro"
+    )
     return "roc-auc-score", res
 
 
@@ -35,14 +52,14 @@ class LgbHomeService(HomeServiceDataHandle):
     params_best_fit = {
         # "task": "train",
         "boosting_type": "gbdt",
-        "objective": "binary",
+        "objective": "xentropy",
         "is_unbalance": True,
-        "metric": {"binary_error"},  # same as accuracy (% time predicted was wrong)
+        # "metric": {"binary_error"},  # same as accuracy (% time predicted was wrong)
         "num_leaves": 100,
         "learning_rate": 0.04,
-        # 'bagging_fraction': 0.95,
-        # 'feature_fraction': 0.98,
-        # 'bagging_freq': 6,
+        "bagging_fraction": 0.95,
+        "feature_fraction": 0.98,
+        "bagging_freq": 6,
         "max_depth": -1,
         # 'max_bin': 511,
         # 'min_data_in_leaf': 20,
@@ -70,6 +87,7 @@ class LgbHomeService(HomeServiceDataHandle):
         booster = lgb.train(
             params=self.params_best_fit,
             feval=my_lgb_roc_auc_score,
+            # fobj=my_lgb_loglikelood,
             train_set=dtrain,
             valid_sets=watchlist,
             # learning_rates=lambda iter: 0.05 * (0.99 ** iter),
@@ -131,7 +149,7 @@ class XgbHomeService(HomeServiceDataHandle):
 
     def validate(self, **kwargs):
         dtrain, dtest = self.get_train_valid_set(as_xgb_dmatrix=True)
-        watchlist = [(dtrain, 'train'), (dtest, 'eval')]
+        watchlist = [(dtrain, "train"), (dtest, "eval")]
 
         booster = xgb.train(
             params=self.params_best_fit,
