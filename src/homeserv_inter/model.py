@@ -1,6 +1,7 @@
 import warnings
 
 import lightgbm as lgb
+import xgboost as xgb
 from hyperopt import hp, tpe
 from hyperopt.fmin import fmin
 from sklearn import metrics, model_selection
@@ -11,15 +12,23 @@ from wax_toolbox import Timer
 warnings.filterwarnings(action="ignore", category=DeprecationWarning)
 
 
+# Notes:
+# 3 times more of class 0 than class 1
 
-# Example custom objective & metric:
-# https://github.com/Microsoft/LightGBM/blob/master/examples/python-guide/advanced_example.py
+def my_lgb_roc_auc_score(y_pred, y_true):
+    # Example custom objective & metric:
+    # https://github.com/Microsoft/LightGBM/blob/master/examples/python-guide/advanced_example.py
 
-def my_roc_auc_score(y_pred, y_true):
     # self-defined eval metric
     # f(preds: array, train_data: Dataset) -> name: string, eval_result: float, is_higher_better: bool
+
     res = metrics.roc_auc_score(y_true=y_true.label, y_score=y_pred, average="macro")
-    return 'roc_auc_score', res, True
+    return "roc_auc_score", res, True
+
+def my_xgb_roc_auc_score(y_pred, y_true):
+    # https://github.com/dmlc/xgboost/blob/master/demo/guide-python/custom_objective.py
+    res = metrics.roc_auc_score(y_true=y_true.get_label(), y_score=y_pred, average="macro")
+    return "roc-auc-score", res
 
 
 class LgbHomeService(HomeServiceDataHandle):
@@ -27,16 +36,16 @@ class LgbHomeService(HomeServiceDataHandle):
         # "task": "train",
         "boosting_type": "gbdt",
         "objective": "binary",
-        "metric": {"binary_logloss", "binary_error", "auc"},
-        # "learning_rate": 0.08,
-        # "max_depth": 30,
-        # "n_estimators": 300,
-        # "num_leaves": 1400,
-        # "feature_fraction": 0.9,
-        # "bagging_fraction": 0.8,
-        # "bagging_freq": 5,
-        # "num_leaves": 1400,
-        # "max_depth": 5,
+        "is_unbalance": True,
+        "metric": {"binary_error"},  # same as accuracy (% time predicted was wrong)
+        "num_leaves": 100,
+        "learning_rate": 0.04,
+        # 'bagging_fraction': 0.95,
+        # 'feature_fraction': 0.98,
+        # 'bagging_freq': 6,
+        "max_depth": -1,
+        # 'max_bin': 511,
+        # 'min_data_in_leaf': 20,
         "verbose": -1,
         "nthreads": 4,
     }
@@ -56,14 +65,17 @@ class LgbHomeService(HomeServiceDataHandle):
 
     def validate(self, early_stopping_rounds=20):
         dtrain, dtest = self.get_train_valid_set(as_lgb_dataset=True)
-        return lgb.train(
+        watchlist = [dtrain, dtest]
+
+        booster = lgb.train(
             params=self.params_best_fit,
-            feval=my_roc_auc_score,
-            learning_rates=lambda iter: 0.05 * (0.99 ** iter),
+            feval=my_lgb_roc_auc_score,
             train_set=dtrain,
-            valid_sets=[dtest],
+            valid_sets=watchlist,
+            # learning_rates=lambda iter: 0.05 * (0.99 ** iter),
             early_stopping_rounds=early_stopping_rounds,
         )
+        return
 
     def cv(self, nfolds=5, early_stopping_rounds=10):
         dtrain = self.get_train_set(as_lgb_dataset=True)
@@ -98,3 +110,43 @@ class LgbHomeService(HomeServiceDataHandle):
 
     def params_tuning_hyperopt(self):
         pass
+
+
+class XgbHomeService(HomeServiceDataHandle):
+    # https://www.analyticsvidhya.com/blog/2016/03/complete-guide-parameter-tuning-xgboost-with-codes-python/
+    params_best_fit = {
+        "nthread": 4,
+        "booster": "gbtree",
+        "objective": "binary:logistic",
+        "eval_metric": "error",
+        "max_depth": 10,
+        "eta": 0.1,  # analogous to learning_rate
+        # "gamma": 0.015,
+        # "subsample": max(min(subsample, 1), 0),
+        # "colsample_bytree": max(min(colsample_bytree, 1), 0),
+        # "min_child_weight": min_child_weight,
+        # "max_delta_step": int(max_delta_step),
+        "silent": True,
+    }
+
+    def validate(self, early_stopping_rounds=20):
+        dtrain, dtest = self.get_train_valid_set(as_xgb_dmatrix=True)
+        watchlist = [(dtrain, 'train'), (dtest, 'eval')]
+
+        booster = xgb.train(
+            params=self.params_best_fit,
+            feval=my_xgb_roc_auc_score,
+            maximize=True,  # whether to maximize feval
+            dtrain=dtrain,
+            evals=watchlist,
+            early_stopping_rounds=early_stopping_rounds,
+        )
+        return
+
+    def cv(self, nfolds=5, early_stopping_rounds=10):
+        dtrain = self.get_train_set(as_xgb_dataset=True)
+        return xgb.cv(
+            params=self.params_best_fit,
+            train_set=dtrain,
+            early_stopping_rounds=early_stopping_rounds,
+        )

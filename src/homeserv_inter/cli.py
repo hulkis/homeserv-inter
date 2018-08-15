@@ -4,7 +4,7 @@ import pandas as pd
 
 from homeserv_inter.constants import DATA_DIR, RAW_DATA_DIR, NUMERIC_COLS, STR_COLS
 from homeserv_inter.datahandler import generate_cleaned_sets
-from homeserv_inter.model import LgbHomeService
+from homeserv_inter.model import LgbHomeService, XgbHomeService
 from wax_toolbox import Timer
 
 
@@ -172,6 +172,7 @@ def main():
         {
             "convert-raw": convert_csv_to_parquet,
             "convert-cleaned": generate_cleaned_sets,
-            "model": LgbHomeService,
+            "lgb": LgbHomeService,
+            "xgb": XgbHomeService,
         }
     )
