@@ -143,7 +143,7 @@ class XgbHomeService(HomeServiceDataHandle):
         )
         return
 
-    def cv(self, nfolds=5, **kwargs=10):
+    def cv(self, nfolds=5, **kwargs):
         dtrain = self.get_train_set(as_xgb_dataset=True)
         return xgb.cv(
             params=self.params_best_fit,
