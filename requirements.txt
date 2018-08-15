@@ -1,7 +1,15 @@
 pbr>=3.0
 pyyaml
-fastparquet
-pandas
-#wax-toolbox
+
+# Tools
+wax-toolbox
 fire
+
+# ML:
+pandas
+fastparquet
 lightgbm
+xgboost
+sklearn
+hyperopt
+numpy
