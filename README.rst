@@ -33,3 +33,8 @@ Todo
 ----
 
 hyperopt: https://www.kaggle.com/eikedehling/tune-and-compare-xgb-lightgbm-rf-with-hyperopt
+
+
+> homeserv lgb validate --debug=False --num-boost-round=10000 --early-stopping-rounds=100
+
+[4751]  training's xentropy: 0.33594    training's roc_auc_score: 0.938581      valid_1's xentropy: 0.479222    valid_1's roc_auc_score: 0.751526
