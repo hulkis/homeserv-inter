@@ -1,8 +1,8 @@
 import warnings
-from hyperopt import hp, tpe
-from hyperopt.fmin import fmin
 
 import lightgbm as lgb
+from hyperopt import hp, tpe
+from hyperopt.fmin import fmin
 from sklearn import metrics, model_selection
 
 from homeserv_inter.datahandler import HomeServiceDataHandle
@@ -24,24 +24,25 @@ class LgbHomeService(HomeServiceDataHandle):
         # "feature_fraction": 0.9,
         # "bagging_fraction": 0.8,
         # "bagging_freq": 5,
+        "num_leaves": 1400,
+        "max_depth": 5,
+        "learning_rate": 0.08,
         "verbose": -1,
         "nthreads": 4,
     }
 
     hyperopt_space = {
-        'n_estimators': hp.quniform('n_estimators', 25, 500, 25),
-        'max_depth': hp.quniform('max_depth', 1, 10, 1)
+        "n_estimators": hp.quniform("n_estimators", 25, 500, 25),
+        "max_depth": hp.quniform("max_depth", 1, 10, 1),
     }
 
     # Used by RandomizedSearchCV
     params_discovery = {
-        "learning_rate": [0.08, 0.1, 0.15],
-        "max_depth": [20, 25, 30],
-        "num_leaves": [1000, 1200, 1400],
-        "n_estimators": [100, 200, 300],
+        "learning_rate": [0.001, 0.04, 0.08, 0.1, 0.15],
+        "max_depth": [5, 10, 15, 20, 25, 30],
+        "num_leaves": [200, 400, 500, 700, 900, 1200, 1400],
         # 'min_data_in_leaf': [800],
     }
-
 
     def validate(self, early_stopping_rounds=20):
         dtrain, dtest = self.get_train_valid_set(as_lgb_dataset=True)
@@ -80,8 +81,14 @@ class LgbHomeService(HomeServiceDataHandle):
             )
             rand_grid_search.fit(Xtrain, ytrain.values.ravel())
 
-        print('Best Params: {}'.format(rand_grid_search.best_params_))
+        print("Best Params: {}".format(rand_grid_search.best_params_))
         return rand_grid_search
 
     def params_tuning_hyperopt(self):
         pass
+
+
+if __name__ == "__main__":
+    import fire
+
+    fire.Fire({"lgb": LgbHomeService})
