@@ -11,6 +11,17 @@ from wax_toolbox import Timer
 warnings.filterwarnings(action="ignore", category=DeprecationWarning)
 
 
+
+# Example custom objective & metric:
+# https://github.com/Microsoft/LightGBM/blob/master/examples/python-guide/advanced_example.py
+
+def my_roc_auc_score(y_pred, y_true):
+    # self-defined eval metric
+    # f(preds: array, train_data: Dataset) -> name: string, eval_result: float, is_higher_better: bool
+    res = metrics.roc_auc_score(y_true=y_true.label, y_score=y_pred, average="macro")
+    return 'roc_auc_score', res, True
+
+
 class LgbHomeService(HomeServiceDataHandle):
     params_best_fit = {
         # "task": "train",
@@ -24,9 +35,8 @@ class LgbHomeService(HomeServiceDataHandle):
         # "feature_fraction": 0.9,
         # "bagging_fraction": 0.8,
         # "bagging_freq": 5,
-        "num_leaves": 1400,
-        "max_depth": 5,
-        "learning_rate": 0.08,
+        # "num_leaves": 1400,
+        # "max_depth": 5,
         "verbose": -1,
         "nthreads": 4,
     }
@@ -48,6 +58,8 @@ class LgbHomeService(HomeServiceDataHandle):
         dtrain, dtest = self.get_train_valid_set(as_lgb_dataset=True)
         return lgb.train(
             params=self.params_best_fit,
+            feval=my_roc_auc_score,
+            learning_rates=lambda iter: 0.05 * (0.99 ** iter),
             train_set=dtrain,
             valid_sets=[dtest],
             early_stopping_rounds=early_stopping_rounds,
