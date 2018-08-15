@@ -63,7 +63,7 @@ class LgbHomeService(HomeServiceDataHandle):
         # 'min_data_in_leaf': [800],
     }
 
-    def validate(self, early_stopping_rounds=20):
+    def validate(self, **kwargs):
         dtrain, dtest = self.get_train_valid_set(as_lgb_dataset=True)
         watchlist = [dtrain, dtest]
 
@@ -73,16 +73,16 @@ class LgbHomeService(HomeServiceDataHandle):
             train_set=dtrain,
             valid_sets=watchlist,
             # learning_rates=lambda iter: 0.05 * (0.99 ** iter),
-            early_stopping_rounds=early_stopping_rounds,
+            **kwargs,
         )
         return
 
-    def cv(self, nfolds=5, early_stopping_rounds=10):
+    def cv(self, nfolds=5, **kwargs):
         dtrain = self.get_train_set(as_lgb_dataset=True)
         return lgb.cv(
             params=self.params_best_fit,
             train_set=dtrain,
-            early_stopping_rounds=early_stopping_rounds,
+            **kwargs,
         )
 
     def params_tuning_sklearn(self):
@@ -129,7 +129,7 @@ class XgbHomeService(HomeServiceDataHandle):
         "silent": True,
     }
 
-    def validate(self, early_stopping_rounds=20):
+    def validate(self, **kwargs):
         dtrain, dtest = self.get_train_valid_set(as_xgb_dmatrix=True)
         watchlist = [(dtrain, 'train'), (dtest, 'eval')]
 
@@ -139,14 +139,14 @@ class XgbHomeService(HomeServiceDataHandle):
             maximize=True,  # whether to maximize feval
             dtrain=dtrain,
             evals=watchlist,
-            early_stopping_rounds=early_stopping_rounds,
+            **kwargs,
         )
         return
 
-    def cv(self, nfolds=5, early_stopping_rounds=10):
+    def cv(self, nfolds=5, **kwargs=10):
         dtrain = self.get_train_set(as_xgb_dataset=True)
         return xgb.cv(
             params=self.params_best_fit,
             train_set=dtrain,
-            early_stopping_rounds=early_stopping_rounds,
+            **kwargs,
         )
