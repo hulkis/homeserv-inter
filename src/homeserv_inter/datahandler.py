@@ -75,23 +75,18 @@ class HomeServiceDataHandle:
     dftrain = None
     dftest = None
 
-    def __init__(
-        self,
-        debug=True,
-        mode="validation",
-        drop_cols=["DATE_RESILIATION", "RACHAT_DATE"],
-    ):
+    def __init__(self, debug=True, mode="validation"):
         self.debug = debug
         self.mode = mode
-        self.drop_cols = drop_cols
 
     # Methods to generate cleaned datas:
-    def _generate_cleaned_single_set(self, dataset="train"):
+    def _generate_cleaned_single_set(self, dataset="train", drop_cols=None):
         """Generate one cleaned set amon ['train', 'test']"""
         with Timer("Reading {} set".format(dataset), report_func=print):
             df = pd.read_parquet(DATA_DIR / "{}.parquet.gzip".format(dataset))
 
-        df = df.drop(columns=self.drop_cols)
+        if drop_cols is not None:
+            df = df.drop(columns=drop_cols)
         df, label_encoders = build_features(df)
 
         pathpickle = CLEANED_DATA_DIR / "{}_labelencoders.pickle".format(dataset)
@@ -102,13 +97,13 @@ class HomeServiceDataHandle:
         with Timer("Saving into {}".format(savepath)):
             df.to_parquet(savepath, compression="gzip")
 
-    def generate_cleaned_sets(self):
+    def generate_cleaned_sets(self, drop_cols=["DATE_RESILIATION", "RACHAT_DATE"]):
         """Generate cleaned sets."""
         with Timer("Gen clean trainset", report_at_enter=True, report_func=print):
-            self._generate_cleaned_single_set(dataset="train")
+            self._generate_cleaned_single_set(dataset="train", drop_cols=drop_cols)
 
         with Timer("Gen clean testset", report_at_enter=True, report_func=print):
-            self._generate_cleaned_single_set(dataset="test")
+            self._generate_cleaned_single_set(dataset="test", drop_cols=drop_cols)
 
     # Methods to get cleaned datas:
     def _get_cleaned_single_set(self, dataset="train"):
@@ -116,7 +111,7 @@ class HomeServiceDataHandle:
             pathdata = CLEANED_DATA_DIR / "{}_cleaned.parquet.gzip".format(dataset)
             df = pd.read_parquet(pathdata)
             if self.debug:
-                df = df.sample(n=100000, random_state=SEED).dropna(axis=1, how="all")
+                df = df.sample(n=10000, random_state=SEED).dropna(axis=1, how="all")
 
         pathpickle = CLEANED_DATA_DIR / "{}_labelencoders.pickle".format(dataset)
         with open(pathpickle.as_posix(), "rb") as f:
