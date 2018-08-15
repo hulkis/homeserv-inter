@@ -5,29 +5,17 @@ import pandas as pd
 import xgboost as xgb
 from sklearn import model_selection, preprocessing
 
-from homeserv_inter import (
+from homeserv_inter.constants import (
     CLEANED_DATA_DIR,
     DATA_DIR,
-    label_cols,
-    nlp_cols,
-    timestamp_cols,
+    DROPCOLS,
+    ISNA_COLS,
+    SEED,
+    LABEL_COLS,
+    NLP_COLS,
+    TIMESTAMP_COLS,
 )
 from wax_toolbox.profiling import Timer
-
-SEED = 42
-
-
-def datetime_features(df, col):
-    idx = df[col].dt
-    df[col + "_year"] = pd.to_numeric(idx.year.fillna(0), downcast="unsigned")
-    df[col + "_month"] = pd.to_numeric(idx.month.fillna(0), downcast="unsigned")
-    df[col + "_day"] = pd.to_numeric(idx.day.fillna(0), downcast="unsigned")
-    df[col + "_dayofyear"] = pd.to_numeric(idx.dayofyear.fillna(0), downcast="unsigned")
-    # df[col + "_hour"] = pd.to_numeric(idx.hour.fillna(0), downcast='unsigned')
-    # df[col + "_minute"] = pd.to_numeric(idx.minute.fillna(0), downcast='unsigned')
-    df[col + "_week"] = pd.to_numeric(idx.week.fillna(0), downcast="unsigned")
-    df[col + "_weekday"] = pd.to_numeric(idx.weekday.fillna(0), downcast="unsigned")
-    return df
 
 
 def _encode_labels(df, label_cols):
@@ -49,23 +37,81 @@ def _decode_labels(df, label_cols, label_encoders):
     return df
 
 
+# Feature ing.:
+def datetime_features(df, col):
+    idx = df[col].dt
+    df[col + "_year"] = pd.to_numeric(idx.year.fillna(0), downcast="unsigned")
+    df[col + "_month"] = pd.to_numeric(idx.month.fillna(0), downcast="unsigned")
+    df[col + "_day"] = pd.to_numeric(idx.day.fillna(0), downcast="unsigned")
+    df[col + "_dayofyear"] = pd.to_numeric(idx.dayofyear.fillna(0), downcast="unsigned")
+    # df[col + "_hour"] = pd.to_numeric(idx.hour.fillna(0), downcast='unsigned')
+    # df[col + "_minute"] = pd.to_numeric(idx.minute.fillna(0), downcast='unsigned')
+    df[col + "_week"] = pd.to_numeric(idx.week.fillna(0), downcast="unsigned")
+    df[col + "_weekday"] = pd.to_numeric(idx.weekday.fillna(0), downcast="unsigned")
+    return df
+
+
 def build_features(df):
     """Build features."""
 
+    # Intervention duration
+    serie = (
+        df["SCHEDULED_END_DATE"] - df["SCHEDULED_START_DATE"]
+    ).dt.total_seconds() / 3600
+    df["INTERVENTION_DURATION_HOUR"] = pd.to_numeric(serie, downcast="unsigned")
+    df = df.drop(columns=["SCHEDULED_END_DATE", "SCHEDULED_START_DATE"])
+
+    # Is Not a Number columns:
+    for col in ISNA_COLS:
+        df[col + "_isna"] = pd.to_numeric(
+            df[col].isna().astype(int), downcast="unsigned"
+        )
+    df = df.drop(columns=ISNA_COLS)
+
     with Timer("Building timestamp features", report_func=print):
         columns = df.columns.tolist()
-        for col in timestamp_cols:
+        for col in TIMESTAMP_COLS:
             if col in columns:
                 df = datetime_features(df, col)
                 df = df.drop(columns=[col])
 
     with Timer("Encoding labels", report_func=print):
+        label_cols = list(set(df.columns).intersection(set(LABEL_COLS)))
         df, label_encoders = _encode_labels(df, label_cols)
 
     # Still to do, nlp on nlp_cols
+    nlp_cols = list(set(df.columns).intersection(set(NLP_COLS)))
     df = df.drop(columns=nlp_cols)
 
     return df, label_encoders
+
+
+# Methods to generate cleaned datas:
+def _generate_cleaned_single_set(dataset, drop_cols=None):
+    """Generate one cleaned set amon ['train', 'test']"""
+    with Timer("Reading {} set".format(dataset), report_func=print):
+        df = pd.read_parquet(DATA_DIR / "{}.parquet.gzip".format(dataset))
+
+    if drop_cols is not None:
+        df = df.drop(columns=drop_cols)
+    df, label_encoders = build_features(df)
+
+    pathpickle = CLEANED_DATA_DIR / "{}_labelencoders.pickle".format(dataset)
+    with open(pathpickle.as_posix(), "wb") as f:
+        pickle.dump(label_encoders, f)
+
+    savepath = CLEANED_DATA_DIR / "{}_cleaned.parquet.gzip".format(dataset)
+    with Timer("Saving into {}".format(savepath)):
+        df.to_parquet(savepath, compression="gzip")
+
+
+def generate_cleaned_sets(drop_cols=DROPCOLS):
+    """Generate cleaned sets."""
+    with Timer("Gen clean trainset", report_at_enter=True, report_func=print):
+        _generate_cleaned_single_set(dataset="train", drop_cols=drop_cols)
+
+    with Timer("Gen clean testset", report_at_enter=True, report_func=print):
+        _generate_cleaned_single_set(dataset="test", drop_cols=drop_cols)
 
 
 class HomeServiceDataHandle:
@@ -78,32 +124,6 @@ class HomeServiceDataHandle:
     def __init__(self, debug=True, mode="validation"):
         self.debug = debug
         self.mode = mode
-
-    # Methods to generate cleaned datas:
-    def _generate_cleaned_single_set(self, dataset="train", drop_cols=None):
-        """Generate one cleaned set amon ['train', 'test']"""
-        with Timer("Reading {} set".format(dataset), report_func=print):
-            df = pd.read_parquet(DATA_DIR / "{}.parquet.gzip".format(dataset))
-
-        if drop_cols is not None:
-            df = df.drop(columns=drop_cols)
-        df, label_encoders = build_features(df)
-
-        pathpickle = CLEANED_DATA_DIR / "{}_labelencoders.pickle".format(dataset)
-        with open(pathpickle.as_posix(), "wb") as f:
-            pickle.dump(label_encoders, f)
-
-        savepath = CLEANED_DATA_DIR / "{}_cleaned.parquet.gzip".format(dataset)
-        with Timer("Saving into {}".format(savepath)):
-            df.to_parquet(savepath, compression="gzip")
-
-    def generate_cleaned_sets(self, drop_cols=["DATE_RESILIATION", "RACHAT_DATE"]):
-        """Generate cleaned sets."""
-        with Timer("Gen clean trainset", report_at_enter=True, report_func=print):
-            self._generate_cleaned_single_set(dataset="train", drop_cols=drop_cols)
-
-        with Timer("Gen clean testset", report_at_enter=True, report_func=print):
-            self._generate_cleaned_single_set(dataset="test", drop_cols=drop_cols)
 
     # Methods to get cleaned datas:
     def _get_cleaned_single_set(self, dataset="train"):

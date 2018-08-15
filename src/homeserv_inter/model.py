@@ -16,7 +16,7 @@ class LgbHomeService(HomeServiceDataHandle):
         # "task": "train",
         "boosting_type": "gbdt",
         "objective": "binary",
-        "metric": {"binary_logloss", "auc"},
+        "metric": {"binary_logloss", "binary_error", "auc"},
         # "learning_rate": 0.08,
         # "max_depth": 30,
         # "n_estimators": 300,
@@ -86,9 +86,3 @@ class LgbHomeService(HomeServiceDataHandle):
 
     def params_tuning_hyperopt(self):
         pass
-
-
-if __name__ == "__main__":
-    import fire
-
-    fire.Fire({"lgb": LgbHomeService})
