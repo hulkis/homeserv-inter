@@ -7,7 +7,7 @@ fire
 
 # ML:
 pandas
-fastparquet
+pyarrow
 lightgbm
 xgboost
 sklearn

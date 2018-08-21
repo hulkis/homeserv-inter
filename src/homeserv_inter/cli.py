@@ -79,7 +79,7 @@ def convert_csv_to_parquet(engine="pyarrow"):
         dt_cols = ["SCHEDULED_START_DATE", "SCHEDULED_END_DATE", "CRE_DATE_GZL"]
         intervention_train_df = to_datetimes(dt_cols, intervention_train_df)
 
-    with Timer("Reading intervention_test.csv", report_func=print):
+    with Timer("Reading intervention_history.csv", report_func=print):
         intervention_history_df = pd.read_csv(
             RAW_DATA_DIR / "intervention_history.csv", sep="|", encoding="Latin-1"
         )
