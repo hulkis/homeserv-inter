@@ -110,3 +110,4 @@ data/*.parquet.gzip
 *temp-plot.html
 data/floyddata
 data/cleaned
+model_bank/*

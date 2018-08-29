@@ -5,8 +5,9 @@ SRC_DIR = Path(__file__).parent
 DATA_DIR = PKG_DIR / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 CLEANED_DATA_DIR = DATA_DIR / "cleaned"
+MODEL_DIR = PKG_DIR / "model_bank"
 
-for d in [DATA_DIR, RAW_DATA_DIR, CLEANED_DATA_DIR]:
+for d in [DATA_DIR, RAW_DATA_DIR, CLEANED_DATA_DIR, MODEL_DIR]:
     if not d.exists():
         d.mkdir(parents=True)
 

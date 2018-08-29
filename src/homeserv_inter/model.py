@@ -1,4 +1,5 @@
 import warnings
+import pandas as pd
 
 import lightgbm as lgb
 import numpy as np
@@ -7,6 +8,7 @@ from hyperopt import hp, tpe
 from hyperopt.fmin import fmin
 from sklearn import metrics, model_selection
 
+from homeserv_inter.constants import MODEL_DIR
 from homeserv_inter.datahandler import HomeServiceDataHandle
 from wax_toolbox import Timer
 
@@ -54,9 +56,9 @@ class LgbHomeService(HomeServiceDataHandle):
         "boosting_type": "gbdt",
         "objective": "xentropy",
         "is_unbalance": True,
-        # "metric": {"binary_error"},  # same as accuracy (% time predicted was wrong)
+        # "metric": {"binary_error"},  # same as accuracy
         "num_leaves": 100,
-        "learning_rate": 0.04,
+        # "learning_rate": 0.04,
         "bagging_fraction": 0.95,
         "feature_fraction": 0.98,
         "bagging_freq": 6,
@@ -80,6 +82,12 @@ class LgbHomeService(HomeServiceDataHandle):
         # 'min_data_in_leaf': [800],
     }
 
+    @classmethod
+    def save_model(self, booster):
+        now = pd.Timestamp.now(tz='CET')
+        f = MODEL_DIR / 'lgb_model_{}.txt'.format(now.strftime('%d-%Hh-%mm'))
+        booster.save_model(f.as_posix())
+
     def validate(self, **kwargs):
         dtrain, dtest = self.get_train_valid_set(as_lgb_dataset=True)
         watchlist = [dtrain, dtest]
@@ -90,18 +98,25 @@ class LgbHomeService(HomeServiceDataHandle):
             # fobj=my_lgb_loglikelood,
             train_set=dtrain,
             valid_sets=watchlist,
-            # learning_rates=lambda iter: 0.05 * (0.99 ** iter),
+            learning_rates=lambda iter: 0.05 * (0.99 ** iter),
             **kwargs,
         )
+
+        self.save_model(booster)
         return
 
     def cv(self, nfolds=5, **kwargs):
         dtrain = self.get_train_set(as_lgb_dataset=True)
-        return lgb.cv(
+        eval_hist = lgb.cv(
             params=self.params_best_fit,
+            feval=my_lgb_roc_auc_score,
             train_set=dtrain,
+            verbose_eval=True,  # display the progress
+            show_stdv=True,  # display the standard deviation in progress, results are not affected
             **kwargs,
         )
+
+        return eval_hist
 
     def params_tuning_sklearn(self):
         Xtrain, ytrain = self.get_train_set(as_lgb_dataset=False)  # False here !
