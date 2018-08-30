@@ -1,8 +1,9 @@
 import warnings
-import pandas as pd
+from copy import deepcopy
 
 import lightgbm as lgb
 import numpy as np
+import pandas as pd
 import xgboost as xgb
 from hyperopt import hp, tpe
 from hyperopt.fmin import fmin
@@ -76,16 +77,16 @@ class LgbHomeService(HomeServiceDataHandle):
 
     # Used by RandomizedSearchCV
     params_discovery = {
-        "learning_rate": [0.001, 0.04, 0.08, 0.1, 0.15],
-        "max_depth": [5, 10, 15, 20, 25, 30],
-        "num_leaves": [200, 400, 500, 700, 900, 1200, 1400],
-        # 'min_data_in_leaf': [800],
+        "num_leaves": [50, 70, 90, 110, 150, 200, 250, 300],
+        "max_bin": [200, 255, 300],
+        "min_data_in_leaf": [20, 30, 40, 100],
+        "lambda": [0.3, 0.6, 1],  # regularization
     }
 
     @classmethod
     def save_model(self, booster):
-        now = pd.Timestamp.now(tz='CET')
-        f = MODEL_DIR / 'lgb_model_{}.txt'.format(now.strftime('%d-%Hh-%mm'))
+        now = pd.Timestamp.now(tz="CET")
+        f = MODEL_DIR / "lgb_model_{}.txt".format(now.strftime("%d-%Hh-%mm"))
         booster.save_model(f.as_posix())
 
     def validate(self, **kwargs):
@@ -98,7 +99,9 @@ class LgbHomeService(HomeServiceDataHandle):
             # fobj=my_lgb_loglikelood,
             train_set=dtrain,
             valid_sets=watchlist,
-            learning_rates=lambda iter: 0.05 * (0.99 ** iter),
+
+            # so that at 3000th iteration, learning_rate=0.025
+            learning_rates=lambda iter: 0.5 * (0.999 ** iter),
             **kwargs,
         )
 
@@ -118,27 +121,38 @@ class LgbHomeService(HomeServiceDataHandle):
 
         return eval_hist
 
-    def params_tuning_sklearn(self):
+    def params_tuning_sklearn(self, **kwargs):
         Xtrain, ytrain = self.get_train_set(as_lgb_dataset=False)  # False here !
 
-        model = lgb.LGBMClassifier(
-            silent=False, objective="binary", n_jobs=4, random_state=42, verbose=-1
+        # Get classical parameters for model
+        params_fit = deepcopy(self.params_best_fit)
+        for k in self.params_discovery.keys():
+            if k in params_fit:
+                params_fit.pop(k)
+
+        model = lgb.LGBMClassifier(**params_fit, learning_rate=0.04, **kwargs)
+
+        # Define the grid
+        rand_grid_search = model_selection.RandomizedSearchCV(
+            model,
+            param_distributions=self.params_discovery,
+            n_iter=100,  # trade off quality of result / speed
+            scoring=[
+                "accuracy",
+                "roc_auc",
+            ],  # evaluate those predictions on the test set
+            refit="roc_auc",  # refit on roc_auc metric
+            n_jobs=1,  # already running in parallel for lgb
+            cv=5,  # cv of 5 folds
+            verbose=2,  # make it verbose
         )
 
         # http://scikit-learn.org/stable/modules/generated/sklearn.model_selection.RandomizedSearchCV.html#sklearn.model_selection.RandomizedSearchCV
         with Timer("Randomized Search Cross Validation", True):
-            rand_grid_search = model_selection.RandomizedSearchCV(
-                model,
-                param_distributions=self.params_discovery,
-                n_iter=50,
-                scoring=["roc_auc", "accuracy"],
-                refit="roc_auc",
-                cv=5,
-                verbose=2,
-            )
-            rand_grid_search.fit(Xtrain, ytrain.values.ravel())
+            rand_grid_search.fit(X=Xtrain, y=ytrain.values.ravel(), groups=None)
 
         print("Best Params: {}".format(rand_grid_search.best_params_))
+        __import__("IPython").embed()  # Enter Ipython
         return rand_grid_search
 
     def params_tuning_hyperopt(self):
@@ -178,8 +192,4 @@ class XgbHomeService(HomeServiceDataHandle):
 
     def cv(self, nfolds=5, **kwargs):
         dtrain = self.get_train_set(as_xgb_dataset=True)
-        return xgb.cv(
-            params=self.params_best_fit,
-            train_set=dtrain,
-            **kwargs,
-        )
+        return xgb.cv(params=self.params_best_fit, train_set=dtrain, **kwargs)
