@@ -38,3 +38,12 @@ hyperopt: https://www.kaggle.com/eikedehling/tune-and-compare-xgb-lightgbm-rf-wi
 > homeserv lgb validate --debug=False --num-boost-round=10000 --early-stopping-rounds=100
 
 [4751]  training's xentropy: 0.33594    training's roc_auc_score: 0.938581      valid_1's xentropy: 0.479222    valid_1's roc_auc_score: 0.751526
+
+
+Refs
+----
+
+- Solution of winner classification kaggle: https://www.kaggle.com/c/jigsaw-toxic-comment-classification-challenge/discussion/52557
+
+- Hot Encoder for one column to nclass columns with 0 - 1 :
+http://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.LabelBinarizer.html#sklearn.preprocessing.LabelBinarizer
