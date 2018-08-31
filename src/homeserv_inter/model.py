@@ -15,6 +15,8 @@ from wax_toolbox import Timer
 
 warnings.filterwarnings(action="ignore", category=DeprecationWarning)
 
+# Notes:
+# 3 times more of class 0 than class 1
 
 class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
 
@@ -24,7 +26,8 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
     common_params = {
         "verbose": -1,
         "nthreads": 4,
-        "is_unbalance": True,  # unbalanced classes
+        # 'is_unbalance': 'true',  #because training data is unbalance (replaced with scale_pos_weight)
+        "scale_pos_weight": 0.33,  # used only in binary application, weight of labels with positive class
         "objective": "xentropy",  # better optimize on cross-entropy loss for auc
         "metric": {"auc"},  # alias for roc_auc_score
     }
@@ -34,14 +37,19 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
         # "task": "train",
         "boosting_type": "gbdt",
         "learning_rate": 0.04,
-        "num_leaves": 160,
-        "min_data_in_leaf": 10,
-        "max_depth": -1,
-        "bagging_fraction": 0.926,
-        "feature_fraction": 0.936,
-        "bagging_freq": 9,
+        "num_leaves": 100,  # we should let it be smaller than 2^(max_depth)
+        "min_data_in_leaf": 10,  # Minimum number of data need in a child
+        "max_depth": -1,  # -1 means no limit
+        "bagging_fraction": 0.926,  # Subsample ratio of the training instance.
+        "feature_fraction": 0.936,  # Subsample ratio of columns when constructing each tree.
+        "bagging_freq": 9,  # frequence of subsample, <=0 means no enable
         # 'max_bin': 511,
-        # 'min_data_in_leaf': 20,
+        # 'min_data_in_leaf': 20,  # minimal number of data in one leaf
+        # 'min_child_weight': 5,  # Minimum sum of instance weight(hessian) needed in a child(leaf)
+        # 'subsample_for_bin': 200000,  # Number of samples for constructing bin
+        # 'min_split_gain': 0,  # lambda_l1, lambda_l2 and min_gain_to_split to regularization
+        # 'reg_alpha': 0,  # L1 regularization term on weights
+        # 'reg_lambda': 0,  # L2 regularization term on weights
         **common_params,
     }
 
@@ -51,11 +59,11 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
     hypertuning_space = {
         "boosting": hyperopt.hp.choice("boosting", ["gbdt", "rf"]),  # , "dart"]),
         "num_leaves": hyperopt.hp.quniform("num_leaves", 30, 300, 20),
-        "min_data_in_leaf": hyperopt.hp.quniform("min_data_in_leaf", 10, 200, 10),
+        "min_data_in_leaf": hyperopt.hp.quniform("min_data_in_leaf", 10, 100, 10),
         # "learning_rate": hyperopt.hp.uniform("learning_rate", 0.001, 0.1),
         "feature_fraction": hyperopt.hp.uniform("feature_fraction", 0.7, 0.99),
         "bagging_fraction": hyperopt.hp.uniform("bagging_fraction", 0.7, 0.99),
-        "bagging_freq": hyperopt.hp.quniform("bagging_freq", 6, 10, 1),
+        "bagging_freq": hyperopt.hp.quniform("bagging_freq", 0, 10, 2),
     }
 
     @property
