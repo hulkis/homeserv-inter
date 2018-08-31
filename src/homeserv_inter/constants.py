@@ -6,8 +6,9 @@ DATA_DIR = PKG_DIR / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 CLEANED_DATA_DIR = DATA_DIR / "cleaned"
 MODEL_DIR = PKG_DIR / "model_bank"
+TUNING_DIR = PKG_DIR / "tuning_hist"
 
-for d in [DATA_DIR, RAW_DATA_DIR, CLEANED_DATA_DIR, MODEL_DIR]:
+for d in [DATA_DIR, RAW_DATA_DIR, CLEANED_DATA_DIR, MODEL_DIR, TUNING_DIR]:
     if not d.exists():
         d.mkdir(parents=True)
 

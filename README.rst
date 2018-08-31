@@ -43,7 +43,24 @@ hyperopt: https://www.kaggle.com/eikedehling/tune-and-compare-xgb-lightgbm-rf-wi
 Refs
 ----
 
-- Solution of winner classification kaggle: https://www.kaggle.com/c/jigsaw-toxic-comment-classification-challenge/discussion/52557
+- [Solution of winner classification kaggle](https://www.kaggle.com/c/jigsaw-toxic-comment-classification-challenge/discussion/52557)
 
-- Hot Encoder for one column to nclass columns with 0 - 1 :
-http://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.LabelBinarizer.html#sklearn.preprocessing.LabelBinarizer
+- [Hot Encoder for one column to nclass columns with 0 - 1](http://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.LabelBinarizer.html#sklearn.preprocessing.LabelBinarizer)
+
+- [HyperOpt doc on FMin](https://github.com/hyperopt/hyperopt/wiki/FMin)
+
+# Command Line
+--------------
+
+```bash
+
+# HyperOpt tuning
+> homeserv lgb tuning --debug=False --max-evals=100  # 100 CV of 5 folds
+
+# sklearn random gridsearch
+> homeserv lgb params-tuning-sklearn --debug=False --num-boost-round=10000 --early-stopping-rounds=100
+
+# Validate 80% train 20% test on best params (& store model)
+homeserv lgb validate --debug=False --num-boost-round=10000 --early-stopping-rounds=100
+
+```

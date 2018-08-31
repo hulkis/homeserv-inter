@@ -111,3 +111,4 @@ data/*.parquet.gzip
 data/floyddata
 data/cleaned
 model_bank/*
+tuning_hist/*
