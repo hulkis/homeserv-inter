@@ -33,7 +33,7 @@ class LabelEncoderByCol(BaseEstimator, TransformerMixin):
 
     def handle_nans(self, x):
         if self.x_cleaned is None:
-            with Timer('Cleaning NaNs for label encoding'):
+            with Timer("Cleaning NaNs for label encoding"):
                 # Fill missing values with the string 'NaN'
                 x[self.columns] = x[self.columns].fillna("NaN")
 
@@ -72,6 +72,8 @@ class LabelEncoderByCol(BaseEstimator, TransformerMixin):
 
             # https://github.com/Microsoft/LightGBM/blob/master/docs/Parameters.rst#categorical_feature
             # Replace string "NaN" by -1 as lgb: all negative values will be treated as missing values
+            # SHIT ! seg fault when -1 at init booster time, go for np.nan
+            # conversion at the moment we read the parquet file...
             x[el] = x[el].replace("NaN", -1)
 
         return x
@@ -89,17 +91,11 @@ def _decode_labels(df, label_cols, label_encoders):
     return df
 
 
-def get_idx_categorical_features(columns, label_cols=LABEL_COLS):
-    labels_idx = []
-    for i, col in enumerate(columns):
-        if col in label_cols:
-            labels_idx.append(i)
-    return labels_idx
-
-
 # Feature ing.:
 def datetime_features(df, col):
-    serie = df[col].dropna()
+    # It is needed to reconvert to datetime, as parquet fail and get sometimes
+    # int64 which are epoch, but pandas totally handle it like a boss
+    serie = pd.to_datetime(df[col]).dropna()
     df.loc[serie.index, col + "_year"] = serie.dt.year
     df.loc[serie.index, col + "_month"] = serie.dt.month
     df.loc[serie.index, col + "_day"] = serie.dt.day
@@ -124,7 +120,6 @@ def build_features(df):
         for col in TIMESTAMP_COLS:
             if col in columns:
                 df = datetime_features(df, col)
-
 
     with Timer("Encoding labels"):
         label_cols = list(set(df.columns).intersection(set(LABEL_COLS)))
@@ -190,6 +185,11 @@ class HomeServiceDataHandle:
             if self.debug:
                 df = df.sample(n=10000, random_state=SEED).dropna(axis=1, how="all")
 
+        with Timer("Replacing -1 categorical by np.nan"):
+            lst_cols = list(set(df.columns.tolist()).intersection(LABEL_COLS))
+            for col in lst_cols:
+                df[col] = df[col].replace(-1, np.nan)
+
         pathpickle = CLEANED_DATA_DIR / "{}_labelencoders.pickle".format(dataset)
         with open(pathpickle.as_posix(), "rb") as f:
             label_encoders = pickle.load(f)
@@ -203,12 +203,13 @@ class HomeServiceDataHandle:
         df, self.train_label_encoder = self._get_cleaned_single_set(dataset="train")
         train_cols = df.columns.tolist()
         train_cols.remove("target")
-        categorical_feature = get_idx_categorical_features(train_cols)
 
         if as_xgb_dmatrix:
             pass
         elif as_lgb_dataset:
-            return lgb.Dataset(df[train_cols], df[["target"]].values.ravel()), categorical_feature
+            return (
+                lgb.Dataset(df[train_cols], df[["target"]].values.ravel()),
+            )
         else:
             return df[train_cols], df[["target"]]
 
@@ -217,9 +218,6 @@ class HomeServiceDataHandle:
     ):
         df, self.train_label_encoder = self._get_cleaned_single_set(dataset="train")
 
-        train_cols = df.columns.tolist()
-        categorical_feature = get_idx_categorical_features(train_cols)
-
         Xtrain, Xtest, ytrain, ytest = model_selection.train_test_split(
             df.drop(columns=["target"]),
             df[["target"]],
@@ -227,12 +225,14 @@ class HomeServiceDataHandle:
             random_state=42,
         )
         if as_xgb_dmatrix:
-            return xgb.DMatrix(Xtrain, ytrain), xgb.DMatrix(Xtest, ytest), categorical_feature
+            return (
+                xgb.DMatrix(Xtrain, ytrain),
+                xgb.DMatrix(Xtest, ytest),
+            )
         elif as_lgb_dataset:
             return (
                 lgb.Dataset(Xtrain, ytrain.values.ravel()),
                 lgb.Dataset(Xtest, ytest.values.ravel()),
-                categorical_feature,
             )
         else:
             return Xtrain, Xtest, ytrain, ytest

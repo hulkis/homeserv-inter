@@ -8,7 +8,7 @@ import pandas as pd
 import xgboost as xgb
 from sklearn import model_selection
 
-from homeserv_inter.constants import MODEL_DIR, RESULT_DIR, TUNING_DIR
+from homeserv_inter.constants import LABEL_COLS, MODEL_DIR, RESULT_DIR, TUNING_DIR
 from homeserv_inter.datahandler import HomeServiceDataHandle
 from homeserv_inter.tuning import HyperParamsTuning
 from wax_toolbox import Timer
@@ -72,7 +72,11 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
         booster.save_model(f.as_posix())
 
     def validate(self, save_model=True, **kwargs):
-        dtrain, dtest, categorical_feature = self.get_train_valid_set(as_lgb_dataset=True)
+        dtrain, dtest = self.get_train_valid_set(as_lgb_dataset=True)
+
+        cols = dtrain.data.columns.tolist()
+        categorical_feature = list(set(cols).intersection(LABEL_COLS))
+
         watchlist = [dtrain, dtest]
 
         booster = lgb.train(
@@ -102,7 +106,12 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
     ):
 
         if self.dtrain is None:
-            self.dtrain, self.categorical_feature = self.get_train_set(as_lgb_dataset=True)
+            self.dtrain, self.categorical_feature = self.get_train_set(
+                as_lgb_dataset=True
+            )
+
+        cols = self.dtrain.data.columns.tolist()
+        categorical_feature = list(set(cols).intersection(LABEL_COLS))
 
         # If no params_model is given, take self.params_best_fit
         if params_model is None:
@@ -110,7 +119,7 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
 
         eval_hist = lgb.cv(
             params=params_model,
-            categorical_feature=self.categorical_feature,
+            categorical_feature=categorical_feature,
             # feval=my_lgb_roc_auc_score,
             train_set=self.dtrain,
             verbose_eval=True,  # display the progress
