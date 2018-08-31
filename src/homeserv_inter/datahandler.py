@@ -138,6 +138,10 @@ class HomeServiceDataHandle:
             label_encoders = pickle.load(f)
         return df, label_encoders
 
+    def get_test_set(self):
+        df, self.test_label_encoder = self._get_cleaned_single_set(dataset="test")
+        return df
+
     def get_train_set(self, as_xgb_dmatrix=False, as_lgb_dataset=False):
         df, self.train_label_encoder = self._get_cleaned_single_set(dataset="train")
         train_cols = df.columns.tolist()

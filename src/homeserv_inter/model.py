@@ -8,7 +8,7 @@ import pandas as pd
 import xgboost as xgb
 from sklearn import model_selection
 
-from homeserv_inter.constants import MODEL_DIR, TUNING_DIR
+from homeserv_inter.constants import MODEL_DIR, TUNING_DIR, RESULT_DIR
 from homeserv_inter.datahandler import HomeServiceDataHandle
 from homeserv_inter.tuning import HyperParamsTuning
 from wax_toolbox import Timer
@@ -33,12 +33,13 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
     params_best_fit = {
         # "task": "train",
         "boosting_type": "gbdt",
-        # "learning_rate": 0.04,
-        "num_leaves": 100,
+        "learning_rate": 0.04,
+        "num_leaves": 160,
+        "min_data_in_leaf": 10,
         "max_depth": -1,
-        "bagging_fraction": 0.95,
-        "feature_fraction": 0.98,
-        "bagging_freq": 6,
+        "bagging_fraction": 0.926,
+        "feature_fraction": 0.936,
+        "bagging_freq": 9,
         # 'max_bin': 511,
         # 'min_data_in_leaf': 20,
         **common_params,
@@ -67,7 +68,7 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
 
     @classmethod
     def save_model(self, booster):
-        f = MODEL_DIR / "lgb_model_{}.txt".format(self.now)
+        f = MODEL_DIR / "lgb_model_{}.txt".format(self.nowstr)
         booster.save_model(f.as_posix())
 
     def validate(self, save_model=True, **kwargs):
@@ -81,7 +82,7 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
             train_set=dtrain,
             valid_sets=watchlist,
             # so that at 3000th iteration, learning_rate=0.025
-            learning_rates=lambda iter: 0.5 * (0.999 ** iter),
+            # learning_rates=lambda iter: 0.5 * (0.999 ** iter),
             **kwargs,
         )
 
@@ -184,6 +185,29 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
         }
 
         return result
+
+    def generate_submit(self, from_model_saved=False):
+
+        if not from_model_saved:
+            dtrain = self.get_train_set(as_lgb_dataset=True)
+
+            booster = lgb.train(
+                params=self.params_best_fit,
+                train_set=dtrain,
+                num_boost_round=4650,
+            )
+
+            self.save_model(booster)
+
+        else:
+            booster = lgb.Booster(model_file=from_model_saved)
+
+        df = self.get_test_set()
+        with Timer('Predicting'):
+            pred = booster.predict(df)
+
+        df = pd.DataFrame({'target': pred})
+        df.to_csv(RESULT_DIR / 'submit_{}.csv'.format(self.nowstr), index=False)
 
 
 class XgbHomeService(HomeServiceDataHandle):

@@ -54,6 +54,11 @@ Results
     [4751]  training's xentropy: 0.33594    training's roc_auc_score: 0.938581      valid_1's xentropy: 0.479222    valid_1's roc_auc_score: 0.751526
 
 
+- On tag v0.0.2:
+  [5218]  training's auc: 0.981714        valid_1's auc: 0.752357
+  Public Score: 0.7181597753
+
+
 Refs
 ----
 
