@@ -46,40 +46,40 @@ def convert_csv_to_parquet(engine="pyarrow"):
             df[col] = pd.to_datetime(df[col])
         return df
 
-    with Timer("Reading organisation.csv", report_func=print):
+    with Timer("Reading organisation.csv"):
         orga_df = pd.read_csv(
             RAW_DATA_DIR / "organisation.csv", sep="|", encoding="Latin-1"
         )
 
-    with Timer("Reading equipment.csv", report_func=print):
+    with Timer("Reading equipment.csv"):
         equipement_df = pd.read_csv(
             RAW_DATA_DIR / "equipment.csv", sep="|", encoding="Latin-1"
         )
         dt_cols = ["INSTALL_DATE", "RACHAT_DATE"]
         equipement_df = to_datetimes(dt_cols, equipement_df)
 
-    with Timer("Reading contract_history.csv", report_func=print):
+    with Timer("Reading contract_history.csv"):
         contrat_history_df = pd.read_csv(
             RAW_DATA_DIR / "contract_history.csv", sep="|", encoding="Latin-1"
         )
         dt_cols = ["CRE_DATE", "UPD_DATE", "DATE_RESILIATION", "DATE_DEBUT", "DATE_FIN"]
         contrat_history_df = to_datetimes(dt_cols, contrat_history_df)
 
-    with Timer("Reading intervention_test.csv", report_func=print):
+    with Timer("Reading intervention_test.csv"):
         intervention_test_df = pd.read_csv(
             RAW_DATA_DIR / "intervention_test.csv", sep="|", encoding="Latin-1"
         )
         dt_cols = ["SCHEDULED_START_DATE", "SCHEDULED_END_DATE", "CRE_DATE_GZL"]
         intervention_test_df = to_datetimes(dt_cols, intervention_test_df)
 
-    with Timer("Reading intervention_train.csv", report_func=print):
+    with Timer("Reading intervention_train.csv"):
         intervention_train_df = pd.read_csv(
             RAW_DATA_DIR / "intervention_train.csv", sep="|", encoding="Latin-1"
         )
         dt_cols = ["SCHEDULED_START_DATE", "SCHEDULED_END_DATE", "CRE_DATE_GZL"]
         intervention_train_df = to_datetimes(dt_cols, intervention_train_df)
 
-    with Timer("Reading intervention_history.csv", report_func=print):
+    with Timer("Reading intervention_history.csv"):
         intervention_history_df = pd.read_csv(
             RAW_DATA_DIR / "intervention_history.csv", sep="|", encoding="Latin-1"
         )
@@ -93,7 +93,7 @@ def convert_csv_to_parquet(engine="pyarrow"):
         ]
         intervention_history_df = to_datetimes(dt_cols, intervention_history_df)
 
-    with Timer("Reading nature-code csv", report_func=print):
+    with Timer("Reading nature-code csv"):
         nature_code_eau_chaude = pd.read_csv(
             RAW_DATA_DIR / "nature-code/nature_code_eau_chaude.csv",
             sep="|",
@@ -146,7 +146,7 @@ def convert_csv_to_parquet(engine="pyarrow"):
         )
         return data
 
-    with Timer("Merging all train set", report_func=print):
+    with Timer("Merging all train set"):
         train_data = prepare_data(intervention_train_df)
         for col in STR_COLS:
             train_data[col] = train_data[col].astype(str)
@@ -156,7 +156,7 @@ def convert_csv_to_parquet(engine="pyarrow"):
             DATA_DIR / "train.parquet.gzip", compression="gzip", engine=engine
         )
 
-    with Timer("Merging all test set", report_func=print):
+    with Timer("Merging all test set"):
         test_data = prepare_data(intervention_test_df)
         for col in STR_COLS:
             test_data[col] = test_data[col].astype(str)

@@ -15,3 +15,5 @@ numpy
 
 hyperopt
 networkx==1.11  # buggy hyperopt
+
+#googlemaps
