@@ -33,6 +33,7 @@ Command Line
 ------------
 
 .. code:: bash
+
     # HyperOpt tuning
     homeserv lgb tuning --debug=False --max-evals=100  # 100 CV of 5 folds
 
