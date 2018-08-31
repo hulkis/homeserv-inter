@@ -207,9 +207,7 @@ class HomeServiceDataHandle:
         if as_xgb_dmatrix:
             pass
         elif as_lgb_dataset:
-            return (
-                lgb.Dataset(df[train_cols], df[["target"]].values.ravel()),
-            )
+            return lgb.Dataset(df[train_cols], df[["target"]].values.ravel())
         else:
             return df[train_cols], df[["target"]]
 

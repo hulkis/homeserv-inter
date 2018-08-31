@@ -106,9 +106,7 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
     ):
 
         if self.dtrain is None:
-            self.dtrain, self.categorical_feature = self.get_train_set(
-                as_lgb_dataset=True
-            )
+            self.dtrain = self.get_train_set(as_lgb_dataset=True)
 
         cols = self.dtrain.data.columns.tolist()
         categorical_feature = list(set(cols).intersection(LABEL_COLS))
