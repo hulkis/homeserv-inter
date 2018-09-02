@@ -19,9 +19,97 @@ warnings.filterwarnings(action="ignore", category=DeprecationWarning)
 # 3 times more of class 0 than class 1
 
 
-class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
+class BaseModelHomeService(HomeServiceDataHandle, HyperParamsTuning):
 
-    dtrain = None
+    # Attributes to be defined:
+    @property
+    def algo():
+        raise NotImplementedError
+
+    @property
+    def common_params():
+        raise NotImplementedError
+
+    @property
+    def params_best_fit():
+        raise NotImplementedError
+
+    # Conveniant properties:
+    @property
+    def now(self):
+        return pd.Timestamp.now(tz="CET")
+
+    @property
+    def nowstr(self):
+        return self.now.strftime("%d-%Hh-%mm")
+
+    def save_model(self, booster):
+        f = MODEL_DIR / "{}_model_{}.txt".format(self.algo, self.nowstr)
+        booster.save_model(f.as_posix())
+
+    def get_df_importance(self, booster):
+        idx = booster.feature_name()
+        arr = booster.feature_importance()
+        dfimp = pd.DataFrame(index=idx, data=arr, columns=["importance"])
+        dfimp["importance"] = dfimp["importance"] / dfimp["importance"].sum()
+        return dfimp.sort_values("importance", ascending=False)
+
+    # Methods to be implemented
+    def train():
+        raise NotImplementedError
+
+    def validate():
+        raise NotImplementedError
+
+    def cv():
+        raise NotImplementedError
+
+    def get_df_importance(self, booster):
+        if hasattr(booster, "feature_name"):  # lightgbm
+            idx = booster.feature_name()
+            arr = booster.feature_importance()
+            df = pd.DataFrame(index=idx, data=arr, columns=["importance"])
+        elif hasattr(booster, "get_score"):  # xgboost
+            serie = pd.Series(booster.get_score())
+            df = pd.DataFrame(columns=["importance"], data=serie)
+        else:
+            raise NotImplementedError
+
+        # Traduce in percentage:
+        df["importance"] = df["importance"] / df["importance"].sum() * 100
+        df = df.sort_values("importance", ascending=False)
+        return df
+
+    def hypertuning_objective(self, params):
+        params = self._ensure_type_params(params)
+        msg = "-- HyperOpt -- CV with {}\n".format(params)
+        params = {**self.common_params, **params}  # recombine with common params
+
+        # Fix learning rate:
+        params["learning_rate"] = 0.04
+
+        with Timer(msg, at_enter=True):
+            eval_hist = self.cv(params_model=params, nfolds=5)
+
+        if "auc-mean" in eval_hist.keys():  # lightgbm
+            score = max(eval_hist["auc-mean"])
+        else:
+            raise NotImplementedError
+
+        result = {
+            "loss": score,
+            "status": hyperopt.STATUS_OK,
+            # -- store other results like this
+            # "eval_time": time.time(),
+            # 'other_stuff': {'type': None, 'value': [0, 1, 2]},
+            # -- attachments are handled differently
+            "attachments": {"eval_hist": eval_hist},
+        }
+
+        return result
+
+
+class LgbHomeService(BaseModelHomeService):
 
     # Common params for LightGBM
     common_params = {
@@ -67,32 +155,11 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
         "bagging_freq": hyperopt.hp.quniform("bagging_freq", 0, 10, 2),
     }
 
-    @property
-    def now(self):
-        return pd.Timestamp.now(tz="CET")
-
-    @property
-    def nowstr(self):
-        return self.now.strftime("%d-%Hh-%mm")
-
-    @classmethod
-    def save_model(self, booster):
-        f = MODEL_DIR / "lgb_model_{}.txt".format(self.nowstr)
-        booster.save_model(f.as_posix())
-
     def validate(self, save_model=True, **kwargs):
         dtrain, dtest = self.get_train_valid_set(as_lgb_dataset=True)
-
-        cols = dtrain.data.columns.tolist()
-        categorical_feature = list(set(cols).intersection(LABEL_COLS))
-
         watchlist = [dtrain, dtest]
-
         booster = lgb.train(
             params=self.params_best_fit,
-            categorical_feature=categorical_feature,
-            # feval=my_lgb_roc_auc_score,
-            # fobj=my_lgb_loglikelood,
             train_set=dtrain,
             valid_sets=watchlist,
             # so that at 3000th iteration, learning_rate=0.025
@@ -111,16 +178,10 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
         nfolds=5,
         num_boost_round=10000,
         early_stopping_rounds=100,
-        use_categorical=True,
         **kwargs,
     ):
 
         dtrain = self.get_train_set(as_lgb_dataset=True)
-
-        if use_categorical:
-            cols = dtrain.data.columns.tolist()
-            categorical_feature = list(set(cols).intersection(LABEL_COLS))
-            kwargs.update['categorical_feature'] = categorical_feature
 
         # If no params_model is given, take self.params_best_fit
         if params_model is None:
@@ -128,7 +189,6 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
 
         eval_hist = lgb.cv(
             params=params_model,
-            # feval=my_lgb_roc_auc_score,
             train_set=dtrain,
             verbose_eval=True,  # display the progress
             show_stdv=True,  # display the standard deviation in progress, results are not affected
@@ -138,72 +198,6 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
         )
 
         return eval_hist
-
-    def params_tuning_sklearn(self, **kwargs):
-        Xtrain, ytrain = self.get_train_set(as_lgb_dataset=False)  # False here !
-
-        # Used by RandomizedSearchCV
-        params_discovery = {
-            "num_leaves": [50, 70, 90, 110, 150, 200, 250, 300],
-            "max_bin": [200, 255, 300],
-            "min_data_in_leaf": [20, 30, 40, 100],
-            "lambda": [0.3, 0.6, 1],  # regularization
-        }
-
-        # Get classical parameters for model
-        params_fit = deepcopy(self.params_best_fit)
-        for k in params_discovery.keys():
-            if k in params_fit:
-                params_fit.pop(k)
-
-        model = lgb.LGBMClassifier(**params_fit, learning_rate=0.04, **kwargs)
-
-        # Define the grid
-        rand_grid_search = model_selection.RandomizedSearchCV(
-            model,
-            param_distributions=self.params_discovery,
-            n_iter=100,  # trade off quality of result / speed
-            scoring=[
-                "accuracy",
-                "roc_auc",
-            ],  # evaluate those predictions on the test set
-            refit="roc_auc",  # refit on roc_auc metric
-            n_jobs=1,  # already running in parallel for lgb
-            cv=5,  # cv of 5 folds
-            verbose=2,  # make it verbose
-        )
-
-        # http://scikit-learn.org/stable/modules/generated/sklearn.model_selection.RandomizedSearchCV.html#sklearn.model_selection.RandomizedSearchCV
-        with Timer("Randomized Search Cross Validation", at_enter=True):
-            rand_grid_search.fit(X=Xtrain, y=ytrain.values.ravel(), groups=None)
-
-        print("Best Params: {}".format(rand_grid_search.best_params_))
-        return rand_grid_search
-
-    def hypertuning_objective(self, params):
-        params = self._ensure_type_params(params)
-        msg = "-- HyperOpt -- CV with {}\n".format(params)
-        params = {**self.common_params, **params}  # recombine with common params
-
-        # Fix learning rate:
-        params["learning_rate"] = 0.04
-
-        with Timer(msg, at_enter=True):
-            eval_hist = self.cv(params_model=params, nfolds=5)
-
-        score = max(eval_hist["auc-mean"])
-
-        result = {
-            "loss": score,
-            "status": hyperopt.STATUS_OK,
-            # -- store other results like this
-            # "eval_time": time.time(),
-            # 'other_stuff': {'type': None, 'value': [0, 1, 2]},
-            # -- attachments are handled differently
-            "attachments": {"eval_hist": eval_hist},
-        }
-
-        return result
 
     def generate_submit(self, from_model_saved=False):
 
@@ -225,12 +219,6 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
 
         df = pd.DataFrame({"target": pred})
         df.to_csv(RESULT_DIR / "submit_{}.csv".format(self.nowstr), index=False)
-
-    def get_df_importance(self, booster):
-        idx = booster.feature_name()
-        arr = booster.feature_importance()
-        dfimp = pd.DataFrame(index=idx, data=arr, columns=["importance"])
-        return dfimp.sort_values("importance", ascending=False)
 
 
 class XgbHomeService(HomeServiceDataHandle):
@@ -262,8 +250,8 @@ class XgbHomeService(HomeServiceDataHandle):
             evals=watchlist,
             **kwargs,
         )
-        return
+        return booster
 
     def cv(self, nfolds=5, **kwargs):
-        dtrain = self.get_train_set(as_xgb_dataset=True)
-        return xgb.cv(params=self.params_best_fit, train_set=dtrain, **kwargs)
+        dtrain = self.get_train_set(as_xgb_dmatrix=True)
+        return xgb.cv(params=self.params_best_fit, dtrain=dtrain, **kwargs)
