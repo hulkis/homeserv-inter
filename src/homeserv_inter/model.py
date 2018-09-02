@@ -18,6 +18,7 @@ warnings.filterwarnings(action="ignore", category=DeprecationWarning)
 # Notes:
 # 3 times more of class 0 than class 1
 
+
 class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
 
     dtrain = None
@@ -57,7 +58,7 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
     int_params = ("num_leaves", "max_depth", "min_data_in_leaf", "bagging_freq")
     float_params = ("learning_rate", "feature_fraction", "bagging_fraction")
     hypertuning_space = {
-        "boosting": hyperopt.hp.choice("boosting", ["gbdt", "rf"]),  # , "dart"]),
+        "boosting": hyperopt.hp.choice("boosting", ["gbdt", "rf", "dart"]),
         "num_leaves": hyperopt.hp.quniform("num_leaves", 30, 300, 20),
         "min_data_in_leaf": hyperopt.hp.quniform("min_data_in_leaf", 10, 100, 10),
         # "learning_rate": hyperopt.hp.uniform("learning_rate", 0.001, 0.1),
@@ -113,10 +114,8 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
         **kwargs,
     ):
 
-        if self.dtrain is None:
-            self.dtrain = self.get_train_set(as_lgb_dataset=True)
-
-        cols = self.dtrain.data.columns.tolist()
+        dtrain = self.get_train_set(as_lgb_dataset=True)
+        cols = dtrain.data.columns.tolist()
         categorical_feature = list(set(cols).intersection(LABEL_COLS))
 
         # If no params_model is given, take self.params_best_fit
@@ -127,7 +126,7 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
             params=params_model,
             categorical_feature=categorical_feature,
             # feval=my_lgb_roc_auc_score,
-            train_set=self.dtrain,
+            train_set=dtrain,
             verbose_eval=True,  # display the progress
             show_stdv=True,  # display the standard deviation in progress, results are not affected
             num_boost_round=num_boost_round,

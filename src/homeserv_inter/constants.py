@@ -55,3 +55,13 @@ DROPCOLS = [
     "INSTALLATION",
     "SPECIFICATION",
 ]
+
+LOW_IMPORTANCE_FEATURES = [
+    "TYPE_UT",
+    "DATE_DEBUT_year",
+    "DATE_FIN_year",
+    "RENOUVELLEMENT_AGENCE",
+    "PAYS",
+    "SS_TR_FLAG",
+    "PROBLEM_DESC",
+]
