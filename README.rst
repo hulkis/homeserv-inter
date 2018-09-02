@@ -73,6 +73,8 @@ Refs
 
 - `Hot Encoder for one column to nclass columns with 0 - 1 <http://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.LabelBinarizer.html#sklearn.preprocessing.LabelBinarizer>`_
 
+- `Hot Encoder with only pandas methods <http://pandas.pydata.org/pandas-docs/stable/generated/pandas.get_dummies.html>`_
+
 - `HyperOpt doc on FMin <https://github.com/hyperopt/hyperopt/wiki/FMin>`_
 
 - `HyperOpt simple example usage <https://www.kaggle.com/eikedehling/tune-and-compare-xgb-lightgbm-rf-with-hyperopt>`_
