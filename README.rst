@@ -51,6 +51,7 @@ Results
 - On tag v0.0.1:
 
   .. code:: bash
+
     homeserv lgb validate --debug=False --num-boost-round=10000 --early-stopping-rounds=100
     #[4751]  training's xentropy: 0.33594    training's roc_auc_score: 0.938581      valid_1's xentropy: 0.479222    valid_1's roc_auc_score: 0.751526
 
@@ -58,6 +59,7 @@ Results
 - On tag v0.0.2:
 
   .. code:: bash
+
     > homeserv lgb validate --debug=False --num-boost-round=10000 --early-stopping-rounds=100
     #[5218]  training's auc: 0.981714        valid_1's auc: 0.752357
     #Public Score: 0.7181597753  # using 80% datas for train
