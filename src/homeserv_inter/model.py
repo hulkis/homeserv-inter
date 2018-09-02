@@ -111,12 +111,16 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
         nfolds=5,
         num_boost_round=10000,
         early_stopping_rounds=100,
+        use_categorical=True,
         **kwargs,
     ):
 
         dtrain = self.get_train_set(as_lgb_dataset=True)
-        cols = dtrain.data.columns.tolist()
-        categorical_feature = list(set(cols).intersection(LABEL_COLS))
+
+        if use_categorical:
+            cols = dtrain.data.columns.tolist()
+            categorical_feature = list(set(cols).intersection(LABEL_COLS))
+            kwargs.update['categorical_feature'] = categorical_feature
 
         # If no params_model is given, take self.params_best_fit
         if params_model is None:
@@ -124,7 +128,6 @@ class LgbHomeService(HomeServiceDataHandle, HyperParamsTuning):
 
         eval_hist = lgb.cv(
             params=params_model,
-            categorical_feature=categorical_feature,
             # feval=my_lgb_roc_auc_score,
             train_set=dtrain,
             verbose_eval=True,  # display the progress
