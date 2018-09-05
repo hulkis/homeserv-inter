@@ -19,6 +19,23 @@ warnings.filterwarnings(action="ignore", category=DeprecationWarning)
 # 3 times more of class 0 than class 1
 
 
+def get_df_importance(booster):
+    if hasattr(booster, "feature_name"):  # lightgbm
+        idx = booster.feature_name()
+        arr = booster.feature_importance()
+        df = pd.DataFrame(index=idx, data=arr, columns=["importance"])
+    elif hasattr(booster, "get_score"):  # xgboost
+        serie = pd.Series(booster.get_score())
+        df = pd.DataFrame(columns=["importance"], data=serie)
+    else:
+        raise NotImplementedError
+
+    # Traduce in percentage:
+    df["importance"] = df["importance"] / df["importance"].sum() * 100
+    df = df.sort_values("importance", ascending=False)
+    return df
+
+
 class BaseModelHomeService(HomeServiceDataHandle, HyperParamsTuning):
 
     # Attributes to be defined:
@@ -34,25 +51,10 @@ class BaseModelHomeService(HomeServiceDataHandle, HyperParamsTuning):
     def params_best_fit():
         raise NotImplementedError
 
-    # Conveniant properties:
-    @property
-    def now(self):
-        return pd.Timestamp.now(tz="CET")
-
-    @property
-    def nowstr(self):
-        return self.now.strftime("%d-%Hh-%mm")
-
     def save_model(self, booster):
-        f = MODEL_DIR / "{}_model_{}.txt".format(self.algo, self.nowstr)
+        now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-%mm")
+        f = MODEL_DIR / "{}_model_{}.txt".format(self.algo, now)
         booster.save_model(f.as_posix())
-
-    def get_df_importance(self, booster):
-        idx = booster.feature_name()
-        arr = booster.feature_importance()
-        dfimp = pd.DataFrame(index=idx, data=arr, columns=["importance"])
-        dfimp["importance"] = dfimp["importance"] / dfimp["importance"].sum()
-        return dfimp.sort_values("importance", ascending=False)
 
     # Methods to be implemented
     def train():
@@ -63,22 +65,6 @@ class BaseModelHomeService(HomeServiceDataHandle, HyperParamsTuning):
 
     def cv():
         raise NotImplementedError
-
-    def get_df_importance(self, booster):
-        if hasattr(booster, "feature_name"):  # lightgbm
-            idx = booster.feature_name()
-            arr = booster.feature_importance()
-            df = pd.DataFrame(index=idx, data=arr, columns=["importance"])
-        elif hasattr(booster, "get_score"):  # xgboost
-            serie = pd.Series(booster.get_score())
-            df = pd.DataFrame(columns=["importance"], data=serie)
-        else:
-            raise NotImplementedError
-
-        # Traduce in percentage:
-        df["importance"] = df["importance"] / df["importance"].sum() * 100
-        df = df.sort_values("importance", ascending=False)
-        return df
 
     def hypertuning_objective(self, params):
         params = self._ensure_type_params(params)
@@ -218,7 +204,8 @@ class LgbHomeService(BaseModelHomeService):
             pred = booster.predict(df)
 
         df = pd.DataFrame({"target": pred})
-        df.to_csv(RESULT_DIR / "submit_{}.csv".format(self.nowstr), index=False)
+        now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-%mm")
+        df.to_csv(RESULT_DIR / "submit_{}.csv".format(now), index=False)
 
 
 class XgbHomeService(HomeServiceDataHandle):
