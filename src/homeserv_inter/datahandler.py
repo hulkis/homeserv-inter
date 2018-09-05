@@ -1,3 +1,4 @@
+import gc  # garbage collector
 import pickle
 
 import lightgbm as lgb
@@ -14,7 +15,7 @@ from wax_toolbox.profiling import Timer
 
 
 class LabelEncoderByCol(BaseEstimator, TransformerMixin):
-    x_cleaned = None
+    already_nan_cleaned = False
 
     def __init__(self, columns):
         # List of column names in the DataFrame that should be encoded
@@ -25,7 +26,7 @@ class LabelEncoderByCol(BaseEstimator, TransformerMixin):
             self.label_encoders[el] = LabelEncoder()
 
     def handle_nans(self, x):
-        if self.x_cleaned is None:
+        if not self.already_nan_cleaned:
             with Timer("Cleaning NaNs for label encoding"):
                 # Fill missing values with the string 'NaN'
                 x[self.columns] = x[self.columns].fillna("NaN")
@@ -36,9 +37,8 @@ class LabelEncoderByCol(BaseEstimator, TransformerMixin):
                     for col in self.columns:
                         x[col] = x[col].replace(s, "NaN")
 
-            self.x_cleaned = x.copy()
-
-        return self.x_cleaned
+        self.already_nan_cleaned = True
+        return x
 
     def fit(self, x):
         x = self.handle_nans(x)
@@ -68,6 +68,8 @@ class LabelEncoderByCol(BaseEstimator, TransformerMixin):
             # SHIT ! seg fault when -1 at init booster time, go for np.nan
             # conversion at the moment we read the parquet file...
             x[el] = x[el].replace("NaN", -1)
+
+            x[el] = pd.to_numeric(x[el], downcast='signed')
 
         return x
 
@@ -99,17 +101,12 @@ def datetime_features_single(df, col):
     if col in ['CRE_DATE', 'UPD_DATE']:  # only those got hour, else is day
         df.loc[serie.index, col + "_hour"] = serie.dt.hour
 
-    # Relative features with ref date as CRE_DATE_GZL
-    # (The main date at which the intervention bulletin is created):
-    if col != 'CRE_DATE_GZL':
-        td_col_name = "bulletin_creation_TD_" + col + "_day"
-        df[td_col_name] = (df['CRE_DATE_GZL'] - df[col]).dt.days
-
-    # lst_cols = df.filter(regex=col + "_*").columns.tolist()
-    # for col in lst_cols:
-    #     # Should we put -1 instead of keeping np.nan ?
-    #     # df[col] = df[col].fillna(-1)
-    #     df[col] = pd.to_numeric(df[col], downcast="signed")
+    # Fill na with -1 for integer columns & convert it to signed
+    regex = col + "_(year)|(month)|(day)|(dayofyear)|(week)|(weekday)|(hour)"
+    lst_cols = df.filter(regex=regex).columns.tolist()
+    for col in lst_cols:
+        df[col] = df[col].fillna(-1)
+        df[col] = pd.to_numeric(df[col], downcast="signed")
 
     return df
 
@@ -119,6 +116,12 @@ def build_features_datetime(df):
     for col in TIMESTAMP_COLS:
         if col in columns:
             df = datetime_features_single(df, col)
+
+    # Relative features with ref date as CRE_DATE_GZL
+    # (The main date at which the intervention bulletin is created):
+    for col in [dt for dt in TIMESTAMP_COLS if dt != 'CRE_DATE_GZL']:
+        td_col_name = "bulletin_creation_TD_" + col + "_day"
+        df[td_col_name] = (df['CRE_DATE_GZL'] - df[col]).dt.days
 
     # Some additionnals datetime features
     df['nbdays_duration_of_intervention'] = (
@@ -153,10 +156,14 @@ def build_features(df):
 
     df = df.drop(columns=TIMESTAMP_COLS)
 
+    gc.collect()  # garbage collector
+
     with Timer("Encoding labels"):
         label_cols = list(set(df.columns).intersection(set(LABEL_COLS)))
         label_encoder = LabelEncoderByCol(columns=label_cols)
         df = label_encoder.fit_transform(df)
+
+    gc.collect()  # garbage collector
 
     # Still to do, nlp on nlp_cols, but for the moment take the len of the
     # commentary
@@ -164,13 +171,9 @@ def build_features(df):
     for col in nlp_cols:
         newcol = '{}_len'.format(col)
         df[newcol] = df[col].apply(len)
-        df[df[newcol] == 1] = np.nan
-    df = df.drop(columns=nlp_cols)
+        df[newcol].replace(1, -1)  # considered as NaN
 
-    # # Convert all in integers as there is no float
-    # with Timer("Converting all dataset into integers"):
-    #     for col in df.columns:
-    #         df[col] = pd.to_numeric(df[col], downcast="signed")
+    df = df.drop(columns=nlp_cols)
 
     return df, label_encoder.label_encoders
 
@@ -183,6 +186,7 @@ def _generate_cleaned_single_set(dataset, drop_cols=None):
 
     if drop_cols is not None:
         df = df.drop(columns=drop_cols)
+
     df, label_encoders = build_features(df)
 
     pathpickle = CLEANED_DATA_DIR / "{}_labelencoders.pickle".format(dataset)
@@ -222,10 +226,10 @@ class HomeServiceDataHandle:
             if self.debug:
                 df = df.sample(n=10000, random_state=SEED).dropna(axis=1, how="all")
 
-        # with Timer("Replacing -1 categorical by np.nan"):
-        #     lst_cols = list(set(df.columns.tolist()).intersection(LABEL_COLS))
-        #     for col in lst_cols:
-        #         df[col] = df[col].replace(-1, np.nan)
+        with Timer("Replacing -1 categorical by np.nan"):
+            lst_cols = list(set(df.columns.tolist()).intersection(LABEL_COLS))
+            for col in lst_cols:
+                df[col] = df[col].replace(-1, np.nan)
 
         pathpickle = CLEANED_DATA_DIR / "{}_labelencoders.pickle".format(dataset)
         with open(pathpickle.as_posix(), "rb") as f:
