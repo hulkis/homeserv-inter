@@ -135,9 +135,6 @@ def build_features_datetime(df):
     ).dt.days
 
     # Ratios
-    df['ratio_duration_contract_duration_interv'] = (
-        df['nbdays_duration_of_contract'] / df['nbdays_duration_of_intervention']
-    )
     df['ratio_duration_contract_duration_first_interv'] = (
         df['nbdays_duration_of_contract'] / df['nbdays_delta_intervention_contract_start']
     )
@@ -150,9 +147,6 @@ def build_features(df):
 
     with Timer("Building timestamp features"):
         df = build_features_datetime(df)
-
-    # If Has resiliated
-    df['has_resiliated'] = (~df['DATE_RESILIATION'].isna()).astype(int)
 
     df = df.drop(columns=TIMESTAMP_COLS)
 

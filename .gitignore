@@ -112,4 +112,6 @@ data/floyddata
 data/cleaned
 model_bank/*
 tuning_hist/*
+data/samples
+img/*
 results/*

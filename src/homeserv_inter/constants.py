@@ -70,14 +70,33 @@ _not_categorical = [
 
 # Get categorical_feature from STR_COLS but also from some integers values
 CATEGORICAL_FEATURES = [col for col in STR_COLS if col not in _not_categorical]
-# CATEGORICAL_FEATURES += ['']
+# CATEGORICAL_FEATURES += ['']  #
 
 LOW_IMPORTANCE_FEATURES = [
-    "TYPE_UT",
-    "DATE_DEBUT_year",
-    "DATE_FIN_year",
-    "RENOUVELLEMENT_AGENCE",
-    "PAYS",
-    "SS_TR_FLAG",
-    "PROBLEM_DESC",
+    'SCHEDULED_START_DATE_weekday',
+    'DATE_RESILIATION_week',
+    'DATE_RESILIATION_weekday',
+    'RACHAT_DATE_day',
+    'DATE_FIN_month',
+    'RACHAT_DATE_dayofyear',
+    'nbdays_duration_of_contract',
+    'UPD_DATE_year',
+    'DATE_RESILIATION_year',
+    'RACHAT_DATE_weekday',
+    'USAGE_LOCAL',
+    'CRE_DATE_year',
+    'RACHAT_DATE_week',
+    'DATE_RESILIATION_month',
+    'RACHAT_DATE_month',
+    'SCHEDULED_START_DATE_week',
+    'RACHAT_DATE_year',
+    'TYPE_UT',
+    'DATE_FIN_year',
+    'DATE_DEBUT_year',
+    'SCHEDULED_START_DATE_year',
+    'RENOUVELLEMENT_AGENCE',
+    'SCHEDULED_START_DATE_month',
+    'SS_TR_FLAG',
+    'PROBLEM_DESC',
+    'PAYS',
 ]
