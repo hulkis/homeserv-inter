@@ -97,6 +97,8 @@ class BaseModelHomeService(HomeServiceDataHandle, HyperParamsTuning):
 
 class LgbHomeService(BaseModelHomeService):
 
+    algo = 'lightgbm'
+
     # Common params for LightGBM
     common_params = {
         "verbose": -1,
@@ -209,6 +211,8 @@ class LgbHomeService(BaseModelHomeService):
 
 
 class XgbHomeService(HomeServiceDataHandle):
+    algo = 'xgboost'
+
     # https://www.analyticsvidhya.com/blog/2016/03/complete-guide-parameter-tuning-xgboost-with-codes-python/
     params_best_fit = {
         "nthread": 4,
