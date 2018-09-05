@@ -8,15 +8,8 @@ from sklearn import model_selection, preprocessing
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import LabelEncoder
 
-from homeserv_inter.constants import (
-    CLEANED_DATA_DIR,
-    DATA_DIR,
-    DROPCOLS,
-    LABEL_COLS,
-    NLP_COLS,
-    SEED,
-    TIMESTAMP_COLS,
-)
+from homeserv_inter.constants import (CLEANED_DATA_DIR, DATA_DIR, DROPCOLS, LABEL_COLS, NLP_COLS,
+                                      SEED, TIMESTAMP_COLS)
 from wax_toolbox.profiling import Timer
 
 
@@ -92,7 +85,7 @@ def _decode_labels(df, label_cols, label_encoders):
 
 
 # Feature ing.:
-def datetime_features(df, col):
+def datetime_features_single(df, col):
     # It is needed to reconvert to datetime, as parquet fail and get sometimes
     # int64 which are epoch, but pandas totally handle it like a boss
     serie = pd.to_datetime(df[col]).dropna()
@@ -102,12 +95,49 @@ def datetime_features(df, col):
     df.loc[serie.index, col + "_dayofyear"] = serie.dt.dayofyear
     df.loc[serie.index, col + "_week"] = serie.dt.week
     df.loc[serie.index, col + "_weekday"] = serie.dt.weekday
-    df = df.drop(columns=[col])
 
-    lst_cols = df.filter(regex=col + "_*").columns.tolist()
-    for col in lst_cols:
-        df[col] = df[col].fillna(-1)
-        df[col] = pd.to_numeric(df[col], downcast="signed")
+    if col in ['CRE_DATE', 'UPD_DATE']:  # only those got hour, else is day
+        df.loc[serie.index, col + "_hour"] = serie.dt.hour
+
+    # Relative features with ref date as CRE_DATE_GZL
+    # (The main date at which the intervention bulletin is created):
+    if col != 'CRE_DATE_GZL':
+        td_col_name = "bulletin_creation_TD_" + col + "_day"
+        df[td_col_name] = (df['CRE_DATE_GZL'] - df[col]).dt.days
+
+    # lst_cols = df.filter(regex=col + "_*").columns.tolist()
+    # for col in lst_cols:
+    #     # Should we put -1 instead of keeping np.nan ?
+    #     # df[col] = df[col].fillna(-1)
+    #     df[col] = pd.to_numeric(df[col], downcast="signed")
+
+    return df
+
+
+def build_features_datetime(df):
+    columns = df.columns.tolist()
+    for col in TIMESTAMP_COLS:
+        if col in columns:
+            df = datetime_features_single(df, col)
+
+    # Some additionnals datetime features
+    df['nbdays_duration_of_intervention'] = (
+        df['SCHEDULED_END_DATE'] - df['SCHEDULED_START_DATE']
+    ).dt.days
+    df['nbdays_duration_of_contract'] = (
+        df['DATE_FIN'] - df['DATE_DEBUT']
+    ).dt.days
+    df['nbdays_delta_intervention_contract_start'] = (
+        df['CRE_DATE_GZL'] - df['DATE_DEBUT']
+    ).dt.days
+
+    # Ratios
+    df['ratio_duration_contract_duration_interv'] = (
+        df['nbdays_duration_of_contract'] / df['nbdays_duration_of_intervention']
+    )
+    df['ratio_duration_contract_duration_first_interv'] = (
+        df['nbdays_duration_of_contract'] / df['nbdays_delta_intervention_contract_start']
+    )
 
     return df
 
@@ -116,18 +146,25 @@ def build_features(df):
     """Build features."""
 
     with Timer("Building timestamp features"):
-        columns = df.columns.tolist()
-        for col in TIMESTAMP_COLS:
-            if col in columns:
-                df = datetime_features(df, col)
+        df = build_features_datetime(df)
+
+    # If Has resiliated
+    df['has_resiliated'] = (~df['DATE_RESILIATION'].isna()).astype(int)
+
+    df = df.drop(columns=TIMESTAMP_COLS)
 
     with Timer("Encoding labels"):
         label_cols = list(set(df.columns).intersection(set(LABEL_COLS)))
         label_encoder = LabelEncoderByCol(columns=label_cols)
         df = label_encoder.fit_transform(df)
 
-    # Still to do, nlp on nlp_cols
+    # Still to do, nlp on nlp_cols, but for the moment take the len of the
+    # commentary
     nlp_cols = list(set(df.columns).intersection(set(NLP_COLS)))
+    for col in nlp_cols:
+        newcol = '{}_len'.format(col)
+        df[newcol] = df[col].apply(len)
+        df[df[newcol] == 1] = np.nan
     df = df.drop(columns=nlp_cols)
 
     # # Convert all in integers as there is no float
@@ -185,10 +222,10 @@ class HomeServiceDataHandle:
             if self.debug:
                 df = df.sample(n=10000, random_state=SEED).dropna(axis=1, how="all")
 
-        with Timer("Replacing -1 categorical by np.nan"):
-            lst_cols = list(set(df.columns.tolist()).intersection(LABEL_COLS))
-            for col in lst_cols:
-                df[col] = df[col].replace(-1, np.nan)
+        # with Timer("Replacing -1 categorical by np.nan"):
+        #     lst_cols = list(set(df.columns.tolist()).intersection(LABEL_COLS))
+        #     for col in lst_cols:
+        #         df[col] = df[col].replace(-1, np.nan)
 
         pathpickle = CLEANED_DATA_DIR / "{}_labelencoders.pickle".format(dataset)
         with open(pathpickle.as_posix(), "rb") as f:

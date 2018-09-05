@@ -30,8 +30,9 @@ SEED = 42
 
 DROPCOLS = [
     # 'organisation' table:
-    "L1_ORGANISATION_ID",  # Keep L1_NAME label encoded
-    "L2_ORGANISATION_ID",  # Keep L2_NAME label encoded
+    "L1_ORGANISATION_ID", # Keep L1_NAME label encoded
+    "L2_ORGANISATION_ID", # Keep L2_NAME label encoded
+    "ORGANISATION_ID",    # IS equal to L2_ORGANISATION_ID
 
     # 'contract_history' table:
     # seems all important
@@ -46,15 +47,30 @@ DROPCOLS = [
     "INCIDENT_TYPE_ID", # keep INCIDENT_TYPE_NAME label encoded
     "TYPE_BI",          # seems like a repetition of INCIDENT_TYPE_NAME
     "PROBLEM_CODE",     # keep PROBLEM_DESC label encoded
-    "COMMENTAIRE_BI",   # TODO nlp ?
 
-    # 'nature code' table, keep only code wich are label encoded:
-    "EAU_CHAUDE",
-    "ENERGIE",
-    "FONCTION",
-    "INSTALLATION",
-    "SPECIFICATION",
+    # 'nature code' table:
+    "CODE_EAU_CHAUDE",    # keep EAU_CHAUDE label encoded
+    "CODE_ENERGIE",       # keep ENERGIE label encoded
+    "CODE_FONCTION",      # keep FONCTION label encoded
+    "CODE_INSTALLATION",  # keep INSTALLATION label encoded
+    "CODE_SPECIFICATION", # keep SPECIFICATION label encoded
 ]
+
+# What should not be considered as categorical feature due to too large number:
+_not_categorical = [
+    'COMMENTAIRE_BI',
+    'MODELE_CODE',
+    'NUMERO',
+    'MODELE_LIB',
+    'LOCALISATION_ORGANISME',
+    'RUE',
+    'VILLE',
+    'CONTRACT_MODIFICATEUR',
+]
+
+# Get categorical_feature from STR_COLS but also from some integers values
+CATEGORICAL_FEATURES = [col for col in STR_COLS if col not in _not_categorical]
+# CATEGORICAL_FEATURES += ['']
 
 LOW_IMPORTANCE_FEATURES = [
     "TYPE_UT",
