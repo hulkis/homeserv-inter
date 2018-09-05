@@ -9,8 +9,8 @@ from sklearn import model_selection, preprocessing
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import LabelEncoder
 
-from homeserv_inter.constants import (CLEANED_DATA_DIR, DATA_DIR, DROPCOLS, LABEL_COLS, NLP_COLS,
-                                      SEED, TIMESTAMP_COLS)
+from homeserv_inter.constants import (CLEANED_DATA_DIR, DATA_DIR, DROPCOLS, LABEL_COLS,
+                                      LOW_IMPORTANCE_FEATURES, NLP_COLS, SEED, TIMESTAMP_COLS)
 from wax_toolbox.profiling import Timer
 
 
@@ -208,9 +208,10 @@ class HomeServiceDataHandle:
     dftrain = None
     dftest = None
 
-    def __init__(self, debug=True, mode="validation"):
+    def __init__(self, debug=True, drop_lowimp_features=False, mode="validation"):
         self.debug = debug
         self.mode = mode
+        self.drop_lowimp_features = drop_lowimp_features
 
     # Methods to get cleaned datas:
     def _get_cleaned_single_set(self, dataset="train"):
@@ -232,12 +233,22 @@ class HomeServiceDataHandle:
 
     def get_test_set(self):
         df, self.test_label_encoder = self._get_cleaned_single_set(dataset="test")
+
+        if self.drop_lowimp_features:
+            print('Dropping low importance features !')
+            dropcols = set(df.columns.tolist()).intersection(set(LOW_IMPORTANCE_FEATURES))
+            df = df.drop(columns=list(dropcols))
+
         return df
 
     def get_train_set(self, as_xgb_dmatrix=False, as_lgb_dataset=False):
         df, self.train_label_encoder = self._get_cleaned_single_set(dataset="train")
         train_cols = df.columns.tolist()
         train_cols.remove("target")
+
+        if self.drop_lowimp_features:
+            print('Dropping low importance features !')
+            train_cols = [col for col in train_cols if col not in LOW_IMPORTANCE_FEATURES]
 
         if as_xgb_dmatrix:
             return xgb.DMatrix(df[train_cols], df[["target"]]),
@@ -250,6 +261,11 @@ class HomeServiceDataHandle:
         self, split_perc=0.2, as_xgb_dmatrix=False, as_lgb_dataset=False
     ):
         df, self.train_label_encoder = self._get_cleaned_single_set(dataset="train")
+
+        if self.drop_lowimp_features:
+            print('Dropping low importance features !')
+            dropcols = set(df.columns.tolist()).intersection(set(LOW_IMPORTANCE_FEATURES))
+            df = df.drop(columns=list(dropcols))
 
         Xtrain, Xtest, ytrain, ytest = model_selection.train_test_split(
             df.drop(columns=["target"]),
