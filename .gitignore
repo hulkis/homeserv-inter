@@ -115,3 +115,4 @@ tuning_hist/*
 data/samples
 img/*
 results/*
+data/data-raw-challenge-homeserv.zip

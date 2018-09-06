@@ -69,7 +69,10 @@ class BaseModelHomeService(HomeServiceDataHandle, HyperParamsTuning):
     def hypertuning_objective(self, params):
         params = self._ensure_type_params(params)
         msg = "-- HyperOpt -- CV with {}\n".format(params)
-        params = {**self.common_params, **params}  # recombine with common params
+        params = {
+            **self.common_params,
+            **params
+        }  # recombine with common params
 
         # Fix learning rate:
         params["learning_rate"] = 0.04
@@ -89,7 +92,9 @@ class BaseModelHomeService(HomeServiceDataHandle, HyperParamsTuning):
             # "eval_time": time.time(),
             # 'other_stuff': {'type': None, 'value': [0, 1, 2]},
             # -- attachments are handled differently
-            "attachments": {"eval_hist": eval_hist},
+            "attachments": {
+                "eval_hist": eval_hist
+            },
         }
 
         return result
@@ -131,12 +136,14 @@ class LgbHomeService(BaseModelHomeService):
     }
 
     # Tuning attributes in relation to HyperParamsTuning
-    int_params = ("num_leaves", "max_depth", "min_data_in_leaf", "bagging_freq")
+    int_params = ("num_leaves", "max_depth", "min_data_in_leaf",
+                  "bagging_freq")
     float_params = ("learning_rate", "feature_fraction", "bagging_fraction")
     hypertuning_space = {
         "boosting": hyperopt.hp.choice("boosting", ["gbdt", "rf", "dart"]),
         "num_leaves": hyperopt.hp.quniform("num_leaves", 30, 300, 20),
-        "min_data_in_leaf": hyperopt.hp.quniform("min_data_in_leaf", 10, 100, 10),
+        "min_data_in_leaf": hyperopt.hp.quniform("min_data_in_leaf", 10, 100,
+                                                 10),
         # "learning_rate": hyperopt.hp.uniform("learning_rate", 0.001, 0.1),
         "feature_fraction": hyperopt.hp.uniform("feature_fraction", 0.7, 0.99),
         "bagging_fraction": hyperopt.hp.uniform("bagging_fraction", 0.7, 0.99),
@@ -161,12 +168,12 @@ class LgbHomeService(BaseModelHomeService):
         return booster
 
     def cv(
-        self,
-        params_model=None,
-        nfolds=5,
-        num_boost_round=10000,
-        early_stopping_rounds=100,
-        **kwargs,
+            self,
+            params_model=None,
+            nfolds=5,
+            num_boost_round=10000,
+            early_stopping_rounds=100,
+            **kwargs,
     ):
 
         dtrain = self.get_train_set(as_lgb_dataset=True)
@@ -179,7 +186,8 @@ class LgbHomeService(BaseModelHomeService):
             params=params_model,
             train_set=dtrain,
             verbose_eval=True,  # display the progress
-            show_stdv=True,  # display the standard deviation in progress, results are not affected
+            show_stdv=
+            True,  # display the standard deviation in progress, results are not affected
             num_boost_round=num_boost_round,
             early_stopping_rounds=early_stopping_rounds,
             **kwargs,
@@ -187,14 +195,17 @@ class LgbHomeService(BaseModelHomeService):
 
         return eval_hist
 
-    def generate_submit(self, from_model_saved=False):
+    def generate_submit(self, num_boost_round=None, from_model_saved=False):
 
         if not from_model_saved:
+            assert num_boost_round is not None
+
             dtrain = self.get_train_set(as_lgb_dataset=True)
 
             booster = lgb.train(
-                params=self.params_best_fit, train_set=dtrain, num_boost_round=4650
-            )
+                params=self.params_best_fit,
+                train_set=dtrain,
+                num_boost_round=num_boost_round)
 
             self.save_model(booster)
 

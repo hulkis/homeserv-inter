@@ -65,6 +65,20 @@ Results
     #Public Score: 0.7181597753  # using 80% datas for train
     #Public Score: 0.7205135095  # using 100% datas for train
 
+- On tag v0.0.4:
+
+  .. code:: bash
+
+    > homeserv lgb validate --debug=False --num-boost-round=10000 --early-stopping-rounds=100
+    #[3204]  training's auc: 0.913384        valid_1's auc: 0.753298
+
+    > homeserv lgb cv --debug=False --num-boost-round=10000 --early-stopping-rounds=100 --drop-lowimp-features=True
+    # [5175]  cv_agg's auc: 0.753022 + 0.00132367
+
+    > homeserv lgb generate-submit --debug=False --num-boost-round=4000 --drop-lowimp-features=True
+    # Public score: 0.7348420163  # using 100% datas for train
+
+
 
 Refs
 ----
@@ -79,6 +93,7 @@ Refs
 
 - `HyperOpt simple example usage <https://www.kaggle.com/eikedehling/tune-and-compare-xgb-lightgbm-rf-with-hyperopt>`_
 
+- `Convert 2 Address into distances in python <https://www.woosmap.com/blog/bulk-geocoding-google-api-geopy/>`_
 
 Remarks
 -------
