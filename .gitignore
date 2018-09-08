@@ -116,3 +116,4 @@ data/samples
 img/*
 results/*
 data/data-raw-challenge-homeserv.zip
+data/address_*.pkl

@@ -49,7 +49,7 @@ def build_features_datetime(df):
     # Relative features with ref date as CRE_DATE_GZL
     # (The main date at which the intervention bulletin is created):
     for col in [dt for dt in TIMESTAMP_COLS if dt != 'CRE_DATE_GZL']:
-        td_col_name = "bulletin_creation_TD_" + col + "_day"
+        td_col_name = "bulletin_creation_TD_" + col + "_days"
         df[td_col_name] = (df['CRE_DATE_GZL'] - df[col]).dt.days
 
     # Some additionnals datetime features
@@ -64,6 +64,16 @@ def build_features_datetime(df):
     df['ratio_duration_contract_duration_first_interv'] = (
         df['nbdays_duration_of_contract'] /
         df['nbdays_delta_intervention_contract_start'])
+
+    df['ratio_duration_contract_td_install_days'] = (
+        df['nbdays_duration_of_contract'] /
+        df['bulletin_creation_TD_INSTALL_DATE_days']
+    )
+
+    df['ratio_intervention_contract_start_td_install_days'] = (
+        df['nbdays_delta_intervention_contract_start'] /
+        df['bulletin_creation_TD_INSTALL_DATE_days']
+    )
 
     return df
 

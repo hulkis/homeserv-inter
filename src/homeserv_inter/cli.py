@@ -5,7 +5,7 @@ import pandas as pd
 from homeserv_inter.constants import DATA_DIR, RAW_DATA_DIR, NUMERIC_COLS, STR_COLS
 from homeserv_inter.datahandler import generate_cleaned_sets
 from homeserv_inter.model import LgbHomeService, XgbHomeService
-from homeserv_inter.gmaps import generate_distance_matrix
+from homeserv_inter.gmaps import generate_distance_matrix, request_geocode_datas
 from wax_toolbox import Timer
 
 
@@ -171,7 +171,8 @@ def convert_csv_to_parquet(engine="pyarrow"):
 def main():
     return fire.Fire(
         {
-            "gen-dist-matrix": generate_distance_matrix,
+            # "gen-dist-matrix": generate_distance_matrix,
+            "request-geocode-datas": request_geocode_datas,
             "convert-raw": convert_csv_to_parquet,
             "convert-cleaned": generate_cleaned_sets,
             "lgb": LgbHomeService,
