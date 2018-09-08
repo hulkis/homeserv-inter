@@ -79,6 +79,20 @@ Results
     # Public score: 0.7348420163  # using 100% datas for train
 
 
+  - On tag v0.0.5:
+
+  .. code:: bash
+
+    > homeserv lgb validate --debug=False --num-boost-round=10000 --early-stopping-rounds=100
+    # [4008]  training's auc: 0.93392 valid_1's auc: 0.753489
+
+
+    > homeserv lgb cv --debug=False --num-boost-round=10000 --early-stopping-rounds=100 --drop-lowimp-features=True
+    # [5336]  cv_agg's auc: 0.753045 + 0.000909545
+
+    > homeserv lgb generate-submit --debug=False --num-boost-round=5336 --drop-lowimp-features=True
+    # Public score: 0.7314051236
+
 
 Refs
 ----
