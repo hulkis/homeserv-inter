@@ -68,9 +68,14 @@ _not_categorical = [
     'CONTRACT_MODIFICATEUR',
 ]
 
-# Get categorical_feature from STR_COLS but also from some integers values
-CATEGORICAL_FEATURES = [col for col in STR_COLS if col not in _not_categorical]
-# CATEGORICAL_FEATURES += ['']  #
+# Small number of labels, get it categorical
+CATEGORICAL_FEATURES = [
+    'FORMULE',
+    'ORIGINE_INCIDENT',
+    'TYPE_OCC',
+    'USAGE_LOCAL',
+    'CONDITION_REGLEMENT',
+]
 
 LOW_IMPORTANCE_FEATURES = [
     'SCHEDULED_START_DATE_weekday',

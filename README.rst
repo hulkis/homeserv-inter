@@ -95,6 +95,8 @@ Refs
 
 - `Convert 2 Address into distances in python <https://www.woosmap.com/blog/bulk-geocoding-google-api-geopy/>`_
 
+- `Multi class string <https://towardsdatascience.com/multi-class-text-classification-with-scikit-learn-12f1e60e0a9f>`_
+
 Remarks
 -------
 Hard deps on networkx (dependency of hyperopt) due to https://github.com/hyperopt/hyperopt/issues/325

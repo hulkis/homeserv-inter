@@ -5,6 +5,7 @@ import pandas as pd
 from homeserv_inter.constants import DATA_DIR, RAW_DATA_DIR, NUMERIC_COLS, STR_COLS
 from homeserv_inter.datahandler import generate_cleaned_sets
 from homeserv_inter.model import LgbHomeService, XgbHomeService
+from homeserv_inter.gmaps import generate_distance_matrix
 from wax_toolbox import Timer
 
 
@@ -151,7 +152,7 @@ def convert_csv_to_parquet(engine="pyarrow"):
         for col in STR_COLS:
             train_data[col] = train_data[col].astype(str)
         for col in NUMERIC_COLS + ["target"]:
-            train_data[col] = pd.to_numeric(train_data[col])
+            train_data[col] = pd.to_numeric(train_data[col], downcast='signed')
         train_data.to_parquet(
             DATA_DIR / "train.parquet.gzip", compression="gzip", engine=engine
         )
@@ -161,7 +162,7 @@ def convert_csv_to_parquet(engine="pyarrow"):
         for col in STR_COLS:
             test_data[col] = test_data[col].astype(str)
         for col in NUMERIC_COLS:
-            test_data[col] = pd.to_numeric(test_data[col])
+            test_data[col] = pd.to_numeric(test_data[col], downcast='signed')
         test_data.to_parquet(
             DATA_DIR / "test.parquet.gzip", compression="gzip", engine=engine
         )
@@ -170,6 +171,7 @@ def convert_csv_to_parquet(engine="pyarrow"):
 def main():
     return fire.Fire(
         {
+            "gen-dist-matrix": generate_distance_matrix,
             "convert-raw": convert_csv_to_parquet,
             "convert-cleaned": generate_cleaned_sets,
             "lgb": LgbHomeService,

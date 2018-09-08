@@ -1,89 +1,18 @@
-import gc  # garbage collector
 import pickle
+import re
 
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
 import xgboost as xgb
 from sklearn import model_selection, preprocessing
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.preprocessing import LabelEncoder
 
-from homeserv_inter.constants import (CLEANED_DATA_DIR, DATA_DIR, DROPCOLS, LABEL_COLS,
-                                      LOW_IMPORTANCE_FEATURES, NLP_COLS, SEED, TIMESTAMP_COLS)
+from homeserv_inter.constants import (CLEANED_DATA_DIR, DATA_DIR, DROPCOLS,
+                                      LABEL_COLS, LOW_IMPORTANCE_FEATURES,
+                                      NLP_COLS, SEED, TIMESTAMP_COLS,
+                                      CATEGORICAL_FEATURES)
+from homeserv_inter.sklearn_missval import LabelEncoderByColMissVal
 from wax_toolbox.profiling import Timer
-
-
-class LabelEncoderByCol(BaseEstimator, TransformerMixin):
-    already_nan_cleaned = False
-
-    def __init__(self, columns):
-        # List of column names in the DataFrame that should be encoded
-        self.columns = columns
-        # Dictionary storing a LabelEncoder for each column
-        self.label_encoders = {}
-        for el in self.columns:
-            self.label_encoders[el] = LabelEncoder()
-
-    def handle_nans(self, x):
-        if not self.already_nan_cleaned:
-            with Timer("Cleaning NaNs for label encoding"):
-                # Fill missing values with the string 'NaN'
-                x[self.columns] = x[self.columns].fillna("NaN")
-
-                # str to replace interpreted as NaN:
-                lst_str_nans = ["nan", "", "-"]
-                for s in lst_str_nans:
-                    for col in self.columns:
-                        x[col] = x[col].replace(s, "NaN")
-
-        self.already_nan_cleaned = True
-        return x
-
-    def fit(self, x):
-        x = self.handle_nans(x)
-
-        for el in self.columns:
-            # Only use the values that are not 'NaN' to fit the Encoder
-            a = x[el][x[el] != "NaN"]
-            self.label_encoders[el].fit(a)
-        return self
-
-    def transform(self, x):
-        x = self.handle_nans(x)
-
-        for el in self.columns:
-            # Only use the values that are not 'NaN' to fit the Encoder
-            a = x[el][x[el] != "NaN"]
-            # Store an ndarray of the current column
-            b = x[el].get_values()
-            # Replace the elements in the ndarray that are not 'NaN'
-            # using the transformer
-            b[b != "NaN"] = self.label_encoders[el].transform(a)
-            # Overwrite the column in the DataFrame
-            x[el] = b
-
-            # https://github.com/Microsoft/LightGBM/blob/master/docs/Parameters.rst#categorical_feature
-            # Replace string "NaN" by -1 as lgb: all negative values will be treated as missing values
-            # SHIT ! seg fault when -1 at init booster time, go for np.nan
-            # conversion at the moment we read the parquet file...
-            x[el] = x[el].replace("NaN", -1)
-
-            x[el] = pd.to_numeric(x[el], downcast='signed')
-
-        return x
-
-    def fit_transform(self, x):
-        self.fit(x)
-        return self.transform(x)
-
-
-def _decode_labels(df, label_cols, label_encoders):
-    if not len(label_cols) == len(label_encoders):
-        raise ValueError("Not same len for label_cols and label_encoders.")
-    for i, col in enumerate(label_cols):
-        df[col] = label_cols[i].inverse_transform(df[col])
-    return df
 
 
 # Feature ing.:
@@ -125,19 +54,79 @@ def build_features_datetime(df):
 
     # Some additionnals datetime features
     df['nbdays_duration_of_intervention'] = (
-        df['SCHEDULED_END_DATE'] - df['SCHEDULED_START_DATE']
-    ).dt.days
+        df['SCHEDULED_END_DATE'] - df['SCHEDULED_START_DATE']).dt.days
     df['nbdays_duration_of_contract'] = (
-        df['DATE_FIN'] - df['DATE_DEBUT']
-    ).dt.days
+        df['DATE_FIN'] - df['DATE_DEBUT']).dt.days
     df['nbdays_delta_intervention_contract_start'] = (
-        df['CRE_DATE_GZL'] - df['DATE_DEBUT']
-    ).dt.days
+        df['CRE_DATE_GZL'] - df['DATE_DEBUT']).dt.days
 
     # Ratios
     df['ratio_duration_contract_duration_first_interv'] = (
-        df['nbdays_duration_of_contract'] / df['nbdays_delta_intervention_contract_start']
-    )
+        df['nbdays_duration_of_contract'] /
+        df['nbdays_delta_intervention_contract_start'])
+
+    return df
+
+
+def build_features_str(df):
+    # Some Str cleaning:
+
+    # --> FORMULE:
+    # treat 'SECURITE*' & 'SECURITE* 2V' & 'ESSENTIAL CLIENT' as the same
+    r = re.compile('SECURITE.*')
+    df['FORMULE'] = df['FORMULE'].str.replace(r, 'SECURITE')
+
+    # treat 'ESSENTIEL P2' & 'ESSENTIEL CLIENT' as the same
+    r = re.compile('ESSENTIEL.*')
+    df['FORMULE'] = df['FORMULE'].str.replace(r, 'ESSENTIEL')
+
+    # treat 'Sécurité Pack *' as the same
+    r = re.compile('Sécurité Pack.*')
+    df['FORMULE'] = df['FORMULE'].str.replace(r, 'Sécurité Pack')
+
+    # treat 'TRANQUILITE PRO .*' as nan due to only one register in test set
+    r = re.compile('TRANQUILLITE.*')
+    df['FORMULE'] = df['FORMULE'].replace(r, np.nan)  # no str so that can be np.nan
+
+    # --> ORIGINE_INCIDENT:
+    # treat 'Fax' as nan due to only one register in test set
+    df['ORIGINE_INCIDENT'] = df['ORIGINE_INCIDENT'].replace('Fax', np.nan)
+
+    # treat 'Répondeur', 'Mail', 'Internet' as one label: 'indirect_contact'
+    # but still keep 'Courrier' as it is soooo mainstream, those people are old & odd.
+    r = re.compile('(Répondeur)|(Mail)|(Internet)')
+    df['ORIGINE_INCIDENT'] = df['ORIGINE_INCIDENT'].replace(r, 'indirect_contact')
+
+    # --> INCIDENT_TYPE_NAME
+    # Multi Label Binarize & one hot encoder INCIDENT_TYPE_NAME:
+    # i.e. from :            to:
+    # Dépannage                 1   0
+    # Entretien                 0   1
+    # Dépannage+Entretien       1   1
+
+    df['INCIDENT_TYPE_NAME'] = df['INCIDENT_TYPE_NAME'].str.split('+')
+    mlb = preprocessing.MultiLabelBinarizer()
+    df['INCIDENT_TYPE_NAME'] = list(
+        mlb.fit_transform(df['INCIDENT_TYPE_NAME']))
+    dftmp = pd.DataFrame(
+        index=df['INCIDENT_TYPE_NAME'].index,
+        data=df['INCIDENT_TYPE_NAME'].values.tolist()).add_prefix(
+            'INCIDENT_TYPE_NAME_label')
+    df = pd.concat([df.drop(columns=['INCIDENT_TYPE_NAME']), dftmp], axis=1)
+
+    # Categorical features LabelBinarizer (equivalent to onehotencoding):
+    for col in CATEGORICAL_FEATURES:
+        pass
+
+    # Still to do, nlp on nlp_cols, but for the moment take the len of the
+    # commentary
+    nlp_cols = list(set(df.columns).intersection(set(NLP_COLS)))
+    for col in nlp_cols:
+        newcol = '{}_len'.format(col)
+        df[newcol] = df[col].apply(len)
+        df[newcol].replace(1, -1)  # considered as NaN
+
+    df = df.drop(columns=nlp_cols)
 
     return df
 
@@ -150,26 +139,16 @@ def build_features(df):
 
     df = df.drop(columns=TIMESTAMP_COLS)
 
-    gc.collect()  # garbage collector
+    with Timer("Building str features"):
+        df = build_features_str(df)
 
+    # Just encore the rest
     with Timer("Encoding labels"):
         label_cols = list(set(df.columns).intersection(set(LABEL_COLS)))
-        label_encoder = LabelEncoderByCol(columns=label_cols)
+        label_encoder = LabelEncoderByColMissVal(columns=label_cols)
         df = label_encoder.fit_transform(df)
 
-    gc.collect()  # garbage collector
-
-    # Still to do, nlp on nlp_cols, but for the moment take the len of the
-    # commentary
-    nlp_cols = list(set(df.columns).intersection(set(NLP_COLS)))
-    for col in nlp_cols:
-        newcol = '{}_len'.format(col)
-        df[newcol] = df[col].apply(len)
-        df[newcol].replace(1, -1)  # considered as NaN
-
-    df = df.drop(columns=nlp_cols)
-
-    return df, label_encoder.label_encoders
+    return df
 
 
 # Methods to generate cleaned datas:
@@ -181,11 +160,7 @@ def _generate_cleaned_single_set(dataset, drop_cols=None):
     if drop_cols is not None:
         df = df.drop(columns=drop_cols)
 
-    df, label_encoders = build_features(df)
-
-    pathpickle = CLEANED_DATA_DIR / "{}_labelencoders.pickle".format(dataset)
-    with open(pathpickle.as_posix(), "wb") as f:
-        pickle.dump(label_encoders, f)
+    df = build_features(df)
 
     savepath = CLEANED_DATA_DIR / "{}_cleaned.parquet.gzip".format(dataset)
     with Timer("Saving into {}".format(savepath)):
@@ -208,7 +183,10 @@ class HomeServiceDataHandle:
     dftrain = None
     dftest = None
 
-    def __init__(self, debug=True, drop_lowimp_features=False, mode="validation"):
+    def __init__(self,
+                 debug=True,
+                 drop_lowimp_features=False,
+                 mode="validation"):
         self.debug = debug
         self.mode = mode
         self.drop_lowimp_features = drop_lowimp_features
@@ -216,39 +194,44 @@ class HomeServiceDataHandle:
     # Methods to get cleaned datas:
     def _get_cleaned_single_set(self, dataset="train"):
         with Timer("Reading train set"):
-            pathdata = CLEANED_DATA_DIR / "{}_cleaned.parquet.gzip".format(dataset)
+            pathdata = CLEANED_DATA_DIR / "{}_cleaned.parquet.gzip".format(
+                dataset)
             df = pd.read_parquet(pathdata)
             if self.debug:
-                df = df.sample(n=10000, random_state=SEED).dropna(axis=1, how="all")
+                df = df.sample(
+                    n=10000, random_state=SEED).dropna(
+                        axis=1, how="all")
 
         with Timer("Replacing -1 categorical by np.nan"):
             lst_cols = list(set(df.columns.tolist()).intersection(LABEL_COLS))
             for col in lst_cols:
                 df[col] = df[col].replace(-1, np.nan)
 
-        pathpickle = CLEANED_DATA_DIR / "{}_labelencoders.pickle".format(dataset)
-        with open(pathpickle.as_posix(), "rb") as f:
-            label_encoders = pickle.load(f)
-        return df, label_encoders
+        return df
 
     def get_test_set(self):
-        df, self.test_label_encoder = self._get_cleaned_single_set(dataset="test")
+        df = self._get_cleaned_single_set(
+            dataset="test")
 
         if self.drop_lowimp_features:
             print('Dropping low importance features !')
-            dropcols = set(df.columns.tolist()).intersection(set(LOW_IMPORTANCE_FEATURES))
+            dropcols = set(df.columns.tolist()).intersection(
+                set(LOW_IMPORTANCE_FEATURES))
             df = df.drop(columns=list(dropcols))
 
         return df
 
     def get_train_set(self, as_xgb_dmatrix=False, as_lgb_dataset=False):
-        df, self.train_label_encoder = self._get_cleaned_single_set(dataset="train")
+        df = self._get_cleaned_single_set(
+            dataset="train")
         train_cols = df.columns.tolist()
         train_cols.remove("target")
 
         if self.drop_lowimp_features:
             print('Dropping low importance features !')
-            train_cols = [col for col in train_cols if col not in LOW_IMPORTANCE_FEATURES]
+            train_cols = [
+                col for col in train_cols if col not in LOW_IMPORTANCE_FEATURES
+            ]
 
         if as_xgb_dmatrix:
             return xgb.DMatrix(df[train_cols], df[["target"]]),
@@ -257,14 +240,17 @@ class HomeServiceDataHandle:
         else:
             return df[train_cols], df[["target"]]
 
-    def get_train_valid_set(
-        self, split_perc=0.2, as_xgb_dmatrix=False, as_lgb_dataset=False
-    ):
-        df, self.train_label_encoder = self._get_cleaned_single_set(dataset="train")
+    def get_train_valid_set(self,
+                            split_perc=0.2,
+                            as_xgb_dmatrix=False,
+                            as_lgb_dataset=False):
+        df = self._get_cleaned_single_set(
+            dataset="train")
 
         if self.drop_lowimp_features:
             print('Dropping low importance features !')
-            dropcols = set(df.columns.tolist()).intersection(set(LOW_IMPORTANCE_FEATURES))
+            dropcols = set(df.columns.tolist()).intersection(
+                set(LOW_IMPORTANCE_FEATURES))
             df = df.drop(columns=list(dropcols))
 
         Xtrain, Xtest, ytrain, ytest = model_selection.train_test_split(
