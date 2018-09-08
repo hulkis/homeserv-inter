@@ -104,4 +104,7 @@ LOW_IMPORTANCE_FEATURES = [
     'SS_TR_FLAG',
     'PROBLEM_DESC',
     'PAYS',
+    'SCHEDULED_END_DATE_year',
+    'nbdays_delta_intervention_contract_start',
+    'nbdays_duration_of_intervention',
 ]

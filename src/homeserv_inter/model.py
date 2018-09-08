@@ -140,14 +140,14 @@ class LgbHomeService(BaseModelHomeService):
                   "bagging_freq")
     float_params = ("learning_rate", "feature_fraction", "bagging_fraction")
     hypertuning_space = {
-        "boosting": hyperopt.hp.choice("boosting", ["gbdt", "rf", "dart"]),
+        # "boosting": hyperopt.hp.choice("boosting", ["gbdt", "rf", "dart"]),
         "num_leaves": hyperopt.hp.quniform("num_leaves", 30, 300, 20),
         "min_data_in_leaf": hyperopt.hp.quniform("min_data_in_leaf", 10, 100,
                                                  10),
         # "learning_rate": hyperopt.hp.uniform("learning_rate", 0.001, 0.1),
         "feature_fraction": hyperopt.hp.uniform("feature_fraction", 0.7, 0.99),
         "bagging_fraction": hyperopt.hp.uniform("bagging_fraction", 0.7, 0.99),
-        "bagging_freq": hyperopt.hp.quniform("bagging_freq", 0, 10, 2),
+        "bagging_freq": hyperopt.hp.quniform("bagging_freq", 6, 18, 2),
     }
 
     def validate(self, save_model=True, **kwargs):
