@@ -106,6 +106,9 @@ Results
     > homeserv lgb generate-submit --debug=False --num-boost-round=3800 --drop-lowimp-features=True
     # Public score: 0.7382776847
 
+    > homeserv lgb generate-submit --debug=False --num-boost-round=3400 --drop-lowimp-features=True
+    # Public socre: 0.7381142213
+
 
 Refs
 ----
