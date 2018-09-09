@@ -7,10 +7,9 @@ import pandas as pd
 import xgboost as xgb
 from sklearn import model_selection, preprocessing
 
-from homeserv_inter.constants import (CLEANED_DATA_DIR, DATA_DIR, DROPCOLS,
-                                      LABEL_COLS, LOW_IMPORTANCE_FEATURES,
-                                      NLP_COLS, SEED, TIMESTAMP_COLS,
-                                      CATEGORICAL_FEATURES)
+from homeserv_inter.constants import (
+    CATEGORICAL_FEATURES, CLEANED_DATA_DIR, DATA_DIR, DROPCOLS, LABEL_COLS,
+    LOW_IMPORTANCE_FEATURES, NLP_COLS, SEED, TIMESTAMP_COLS)
 from homeserv_inter.sklearn_missval import LabelEncoderByColMissVal
 from wax_toolbox.profiling import Timer
 
@@ -67,13 +66,11 @@ def build_features_datetime(df):
 
     df['ratio_duration_contract_td_install_days'] = (
         df['nbdays_duration_of_contract'] /
-        df['bulletin_creation_TD_INSTALL_DATE_days']
-    )
+        df['bulletin_creation_TD_INSTALL_DATE_days'])
 
     df['ratio_intervention_contract_start_td_install_days'] = (
         df['nbdays_delta_intervention_contract_start'] /
-        df['bulletin_creation_TD_INSTALL_DATE_days']
-    )
+        df['bulletin_creation_TD_INSTALL_DATE_days'])
 
     return df
 
@@ -96,7 +93,8 @@ def build_features_str(df):
 
     # treat 'TRANQUILITE PRO .*' as nan due to only one register in test set
     r = re.compile('TRANQUILLITE.*')
-    df['FORMULE'] = df['FORMULE'].replace(r, np.nan)  # no str so that can be np.nan
+    df['FORMULE'] = df['FORMULE'].replace(
+        r, np.nan)  # no str so that can be np.nan
 
     # --> ORIGINE_INCIDENT:
     # treat 'Fax' as nan due to only one register in test set
@@ -105,7 +103,8 @@ def build_features_str(df):
     # treat 'Répondeur', 'Mail', 'Internet' as one label: 'indirect_contact'
     # but still keep 'Courrier' as it is soooo mainstream, those people are old & odd.
     r = re.compile('(Répondeur)|(Mail)|(Internet)')
-    df['ORIGINE_INCIDENT'] = df['ORIGINE_INCIDENT'].replace(r, 'indirect_contact')
+    df['ORIGINE_INCIDENT'] = df['ORIGINE_INCIDENT'].replace(
+        r, 'indirect_contact')
 
     # --> INCIDENT_TYPE_NAME
     # Multi Label Binarize & one hot encoder INCIDENT_TYPE_NAME:
@@ -125,8 +124,14 @@ def build_features_str(df):
     df = pd.concat([df.drop(columns=['INCIDENT_TYPE_NAME']), dftmp], axis=1)
 
     # Categorical features LabelBinarizer (equivalent to onehotencoding):
-    for col in CATEGORICAL_FEATURES:
-        pass
+    msg = 'One Hot Encoding for CATEGORICAL_FEATURES with pd.get_dummies'
+    with Timer(msg):
+        for col in CATEGORICAL_FEATURES:
+            df = pd.concat(
+                [pd.get_dummies(df[col], prefix=col),
+                 df.drop(columns=[col])],
+                axis=1,
+            )
 
     # Still to do, nlp on nlp_cols, but for the moment take the len of the
     # commentary
@@ -220,8 +225,7 @@ class HomeServiceDataHandle:
         return df
 
     def get_test_set(self):
-        df = self._get_cleaned_single_set(
-            dataset="test")
+        df = self._get_cleaned_single_set(dataset="test")
 
         if self.drop_lowimp_features:
             print('Dropping low importance features !')
@@ -232,8 +236,7 @@ class HomeServiceDataHandle:
         return df
 
     def get_train_set(self, as_xgb_dmatrix=False, as_lgb_dataset=False):
-        df = self._get_cleaned_single_set(
-            dataset="train")
+        df = self._get_cleaned_single_set(dataset="train")
         train_cols = df.columns.tolist()
         train_cols.remove("target")
 
@@ -254,8 +257,7 @@ class HomeServiceDataHandle:
                             split_perc=0.2,
                             as_xgb_dmatrix=False,
                             as_lgb_dataset=False):
-        df = self._get_cleaned_single_set(
-            dataset="train")
+        df = self._get_cleaned_single_set(dataset="train")
 
         if self.drop_lowimp_features:
             print('Dropping low importance features !')
