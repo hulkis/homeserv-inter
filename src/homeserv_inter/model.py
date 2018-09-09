@@ -114,7 +114,7 @@ class LgbHomeService(BaseModelHomeService):
     # Best fit params
     params_best_fit = {
         # "task": "train",
-        "boosting_type": "gbdt",
+        "boosting_type": "dart",
         "learning_rate": 0.04,
         "num_leaves": 100,  # we should let it be smaller than 2^(max_depth)
         "min_data_in_leaf": 20,  # Minimum number of data need in a child

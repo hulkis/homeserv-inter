@@ -84,7 +84,7 @@ Results
   .. code:: bash
 
     > homeserv lgb validate --debug=False --num-boost-round=10000 --early-stopping-rounds=100
-    # [4008]  training's auc: 0.93392 valid_1's auc: 0.753489
+    # [4008]  training's auc: 0.93392 valid_1's auc: 0.753489  # forgot to drop lowimp-features
 
 
     > homeserv lgb cv --debug=False --num-boost-round=10000 --early-stopping-rounds=100 --drop-lowimp-features=True
@@ -92,6 +92,19 @@ Results
 
     > homeserv lgb generate-submit --debug=False --num-boost-round=5336 --drop-lowimp-features=True
     # Public score: 0.7314051236
+
+
+  - On tag v0.0.6:
+
+  -> Adding onehot encoded features
+  Do not better lightgbm with gbdt
+  We clearly go a problem of overfitting.
+  So let's tweak some parameters, including algorithm used: go for Dart !
+
+  .. code:: bash
+
+    > homeserv lgb generate-submit --debug=False --num-boost-round=3800 --drop-lowimp-features=True
+    # Public score: 0.7382776847
 
 
 Refs

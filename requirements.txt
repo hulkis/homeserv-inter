@@ -8,10 +8,12 @@ fire
 # ML:
 pandas
 pyarrow
-lightgbm
-xgboost
 sklearn
 numpy
+
+xgboost
+lightgbm
+catboost
 
 hyperopt
 networkx==1.11  # buggy hyperopt
