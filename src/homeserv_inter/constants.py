@@ -78,33 +78,51 @@ CATEGORICAL_FEATURES = [
 ]
 
 LOW_IMPORTANCE_FEATURES = [
+    'USAGE_LOCAL',
+    'nbdays_duration_of_contract',
+
     'SCHEDULED_START_DATE_weekday',
+    'SCHEDULED_START_DATE_week',
+    'SCHEDULED_START_DATE_year',
+    'SCHEDULED_START_DATE_month',
+    'SCHEDULED_END_DATE_year',
+
+    'UPD_DATE_year',
+
+    'CRE_DATE_year',
+
+    'DATE_DEBUT_year',
+
+    'DATE_FIN_month',
+    'DATE_FIN_year',
+
+    'RACHAT_DATE_day',
+    'RACHAT_DATE_dayofyear',
+    'RACHAT_DATE_weekday',
+    'RACHAT_DATE_week',
+    'RACHAT_DATE_month',
+    'RACHAT_DATE_year',
+
     'DATE_RESILIATION_week',
     'DATE_RESILIATION_weekday',
-    'RACHAT_DATE_day',
-    'DATE_FIN_month',
-    'RACHAT_DATE_dayofyear',
-    'nbdays_duration_of_contract',
-    'UPD_DATE_year',
     'DATE_RESILIATION_year',
-    'RACHAT_DATE_weekday',
-    'USAGE_LOCAL',
-    'CRE_DATE_year',
-    'RACHAT_DATE_week',
     'DATE_RESILIATION_month',
-    'RACHAT_DATE_month',
-    'SCHEDULED_START_DATE_week',
-    'RACHAT_DATE_year',
+
     'TYPE_UT',
-    'DATE_FIN_year',
-    'DATE_DEBUT_year',
-    'SCHEDULED_START_DATE_year',
     'RENOUVELLEMENT_AGENCE',
-    'SCHEDULED_START_DATE_month',
     'SS_TR_FLAG',
     'PROBLEM_DESC',
     'PAYS',
-    'SCHEDULED_END_DATE_year',
     'nbdays_delta_intervention_contract_start',
     'nbdays_duration_of_intervention',
+
+    'INCIDENT_TYPE_NAME_label0', 'FORMULE_INTEGRAL***', 'FORMULE_SECURITE',
+    'INCIDENT_TYPE_NAME_label1', 'TYPE_OCC_PROPRIETAIRE',
+    'CONDITION_REGLEMENT_PREL01', 'FORMULE_ESSENTIEL', 'FORMULE_SERENITE',
+    'USAGE_LOCAL_HABI', 'CONDITION_REGLEMENT_PREL04',
+    'ORIGINE_INCIDENT_nan', 'USAGE_LOCAL_PRO',
+    'ORIGINE_INCIDENT_indirect_contact', 'FORMULE_Sécurité_Pack',
+    'ORIGINE_INCIDENT_Venue_client', 'ORIGINE_INCIDENT_Courrier',
+    'FORMULE_MULTISERVICES', 'ORIGINE_INCIDENT_Télé-alarme',
+    'USAGE_LOCAL_nan', 'CONDITION_REGLEMENT_nan', 'FORMULE_nan',
 ]
