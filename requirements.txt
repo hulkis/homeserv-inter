@@ -17,3 +17,7 @@ hyperopt
 networkx==1.11  # buggy hyperopt
 
 googlemaps
+geopy
+
+plotlyink
+plotly==2.5
