@@ -1,12 +1,9 @@
-import pickle
 import warnings
-from copy import deepcopy
 
 import hyperopt
 import lightgbm as lgb
 import pandas as pd
 import xgboost as xgb
-from sklearn import model_selection
 
 from homeserv_inter.constants import LABEL_COLS, MODEL_DIR, RESULT_DIR, TUNING_DIR
 from homeserv_inter.datahandler import HomeServiceDataHandle
@@ -120,12 +117,12 @@ class LgbHomeService(BaseModelHomeService):
         "boosting_type": "gbdt",
         "learning_rate": 0.04,
         "num_leaves": 100,  # we should let it be smaller than 2^(max_depth)
-        "min_data_in_leaf": 10,  # Minimum number of data need in a child
+        "min_data_in_leaf": 20,  # Minimum number of data need in a child
         "max_depth": -1,  # -1 means no limit
-        "bagging_fraction": 0.926,  # Subsample ratio of the training instance.
-        "feature_fraction": 0.936,  # Subsample ratio of columns when constructing each tree.
+        "bagging_fraction": 0.84,  # Subsample ratio of the training instance.
+        "feature_fraction": 0.75,  # Subsample ratio of columns when constructing each tree.
         "bagging_freq": 9,  # frequence of subsample, <=0 means no enable
-        # 'max_bin': 511,
+        "max_bin": 200,
         # 'min_data_in_leaf': 20,  # minimal number of data in one leaf
         # 'min_child_weight': 5,  # Minimum sum of instance weight(hessian) needed in a child(leaf)
         # 'subsample_for_bin': 200000,  # Number of samples for constructing bin
@@ -173,6 +170,7 @@ class LgbHomeService(BaseModelHomeService):
             nfolds=5,
             num_boost_round=10000,
             early_stopping_rounds=100,
+            generate_plot=False,
             **kwargs,
     ):
 
@@ -186,12 +184,24 @@ class LgbHomeService(BaseModelHomeService):
             params=params_model,
             train_set=dtrain,
             verbose_eval=True,  # display the progress
-            show_stdv=
-            True,  # display the standard deviation in progress, results are not affected
+            # display the standard deviation in progress, results are not affected
+            show_stdv=True,
             num_boost_round=num_boost_round,
             early_stopping_rounds=early_stopping_rounds,
             **kwargs,
         )
+
+        if generate_plot:
+            try:
+                import plotlyink
+                dfhist = pd.DataFrame(eval_hist)
+                fig = dfhist.iplot.scatter(as_figure=True)
+                import plotly
+                now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-%mm")
+                filepath = RESULT_DIR / 'lgb_eval_hist_{}.html'.format(now)
+                plotly.offline.plot(fig, filename=filepath.as_posix())
+            except ImportError:
+                pass
 
         return eval_hist
 
