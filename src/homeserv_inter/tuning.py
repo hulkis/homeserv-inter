@@ -49,13 +49,13 @@ class HyperParamsTuning:
 
         fpath = TUNING_DIR / "best_params.json"
         print("Saving {}".format(fpath))
-        with open(fpath, "w") as file:
-            file.write(json.dumps(best_params))
+        with open(fpath.as_posix(), "wb") as f:
+            json.dump(best_params, f)
 
         fpath = TUNING_DIR / "all_eval_hist.pkl"
         print("Saving all results in {}".format(fpath))
-        with open(fpath, "w") as file:
-            pickle.dump(obj=trials, file=file)
+        with open(fpath.as_posix(), "wb") as f:
+            pickle.dump(trials, f)
 
     def tuning(self, max_evals=3):
         trials = hyperopt.Trials()

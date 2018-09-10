@@ -104,7 +104,7 @@ class LgbHomeService(BaseModelHomeService):
     # Common params for LightGBM
     common_params = {
         "verbose": -1,
-        "nthreads": 4,
+        "nthreads": 34,
         # 'is_unbalance': 'true',  #because training data is unbalance (replaced with scale_pos_weight)
         "scale_pos_weight": 0.33,  # used only in binary application, weight of labels with positive class
         "objective": "xentropy",  # better optimize on cross-entropy loss for auc
@@ -134,10 +134,11 @@ class LgbHomeService(BaseModelHomeService):
 
     # Tuning attributes in relation to HyperParamsTuning
     int_params = ("num_leaves", "max_depth", "min_data_in_leaf",
-                  "bagging_freq")
-    float_params = ("learning_rate", "feature_fraction", "bagging_fraction")
+                  "bagging_freq", "max_bin")
+    float_params = ("learning_rate", "feature_fraction", "bagging_fraction",
+                    "reg_lambda", "reg_alpha")
     hypertuning_space = {
-        # "boosting": hyperopt.hp.choice("boosting", ["gbdt", "rf", "dart"]),
+        "boosting": hyperopt.hp.choice("boosting", ["gbdt", "dart"]),
         "num_leaves": hyperopt.hp.quniform("num_leaves", 30, 300, 20),
         "min_data_in_leaf": hyperopt.hp.quniform("min_data_in_leaf", 10, 100,
                                                  10),
@@ -145,6 +146,10 @@ class LgbHomeService(BaseModelHomeService):
         "feature_fraction": hyperopt.hp.uniform("feature_fraction", 0.7, 0.99),
         "bagging_fraction": hyperopt.hp.uniform("bagging_fraction", 0.7, 0.99),
         "bagging_freq": hyperopt.hp.quniform("bagging_freq", 6, 18, 2),
+
+        "max_bin": hyperopt.hp.quniform("max_bin", 180, 255, 15),
+        "reg_alpha": hyperopt.hp.uniform("reg_alpha", 0., 0.6),
+        "reg_lambda": hyperopt.hp.uniform("reg_lambda", 0., 0.6),
     }
 
     def validate(self, save_model=True, **kwargs):
