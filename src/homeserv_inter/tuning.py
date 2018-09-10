@@ -1,3 +1,4 @@
+import pickle
 import json
 import logging
 
@@ -50,6 +51,11 @@ class HyperParamsTuning:
         print("Saving {}".format(fpath))
         with open(fpath, "w") as file:
             file.write(json.dumps(best_params))
+
+        fpath = TUNING_DIR / "all_eval_hist.pkl"
+        print("Saving all results in {}".format(fpath))
+        with open(fpath, "w") as file:
+            pickle.dump(obj=trials, file=file)
 
     def tuning(self, max_evals=3):
         trials = hyperopt.Trials()
