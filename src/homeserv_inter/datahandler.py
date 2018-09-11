@@ -247,7 +247,7 @@ class HomeServiceDataHandle:
             ]
 
         if as_xgb_dmatrix:
-            return xgb.DMatrix(df[train_cols], df[["target"]]),
+            return xgb.DMatrix(data=df[train_cols], label=df[["target"]])
         elif as_lgb_dataset:
             return lgb.Dataset(df[train_cols], df[["target"]].values.ravel())
         else:

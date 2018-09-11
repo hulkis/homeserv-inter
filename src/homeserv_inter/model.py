@@ -191,6 +191,7 @@ class LgbHomeService(BaseModelHomeService):
         eval_hist = lgb.cv(
             params=params_model,
             train_set=dtrain,
+            nfolds=nfolds,
             verbose_eval=True,  # display the progress
             # display the standard deviation in progress, results are not affected
             show_stdv=True,
@@ -274,7 +275,7 @@ class XgbHomeService(BaseModelHomeService):
             self.save_model(booster)
         return booster
 
-    def cv(self, params_model=None, nfolds=5,
+    def cv(self, params_model=None, nfold=5,
            num_boost_round=10000, early_stopping_rounds=100,
            generate_plot=False, **kwargs):
 
@@ -286,6 +287,7 @@ class XgbHomeService(BaseModelHomeService):
         eval_hist = xgb.cv(
             params=params_model,
             dtrain=dtrain,
+            nfold=nfold,
             verbose_eval=True,
             show_stdv=True,
             num_boost_round=num_boost_round,
