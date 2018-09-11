@@ -118,7 +118,7 @@ class LgbHomeService(BaseModelHomeService):
     # Common params for LightGBM
     common_params = {
         "verbose": -1,
-        "nthreads": 4,
+        "nthreads": 16,
         # 'is_unbalance': 'true',  #because training data is unbalance (replaced with scale_pos_weight)
         "scale_pos_weight": 0.33,  # used only in binary application, weight of labels with positive class
         "objective": "xentropy",  # better optimize on cross-entropy loss for auc
