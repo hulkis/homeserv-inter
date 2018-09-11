@@ -4,6 +4,7 @@ import hyperopt
 import lightgbm as lgb
 import pandas as pd
 import xgboost as xgb
+import catboost as cgb
 
 from homeserv_inter.constants import LABEL_COLS, MODEL_DIR, RESULT_DIR, TUNING_DIR
 from homeserv_inter.datahandler import HomeServiceDataHandle
@@ -52,6 +53,19 @@ class BaseModelHomeService(HomeServiceDataHandle, HyperParamsTuning):
         now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-%mm")
         f = MODEL_DIR / "{}_model_{}.txt".format(self.algo, now)
         booster.save_model(f.as_posix())
+
+    @staticmethod
+    def _generate_plot(eval_hist):
+        try:
+            import plotlyink
+            dfhist = pd.DataFrame(eval_hist)
+            fig = dfhist.iplot.scatter(as_figure=True)
+            import plotly
+            now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-%mm")
+            filepath = RESULT_DIR / 'lgb_eval_hist_{}.html'.format(now)
+            plotly.offline.plot(fig, filename=filepath.as_posix())
+        except ImportError:
+            pass
 
     # Methods to be implemented
     def train():
@@ -164,15 +178,9 @@ class LgbHomeService(BaseModelHomeService):
 
         return booster
 
-    def cv(
-            self,
-            params_model=None,
-            nfolds=5,
-            num_boost_round=10000,
-            early_stopping_rounds=100,
-            generate_plot=False,
-            **kwargs,
-    ):
+    def cv(self, params_model=None, nfolds=5,
+            num_boost_round=10000, early_stopping_rounds=100,
+            generate_plot=False, **kwargs):
 
         dtrain = self.get_train_set(as_lgb_dataset=True)
 
@@ -192,16 +200,7 @@ class LgbHomeService(BaseModelHomeService):
         )
 
         if generate_plot:
-            try:
-                import plotlyink
-                dfhist = pd.DataFrame(eval_hist)
-                fig = dfhist.iplot.scatter(as_figure=True)
-                import plotly
-                now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-%mm")
-                filepath = RESULT_DIR / 'lgb_eval_hist_{}.html'.format(now)
-                plotly.offline.plot(fig, filename=filepath.as_posix())
-            except ImportError:
-                pass
+            self._generate_plot(eval_hist)
 
         return eval_hist
 
@@ -231,39 +230,128 @@ class LgbHomeService(BaseModelHomeService):
         df.to_csv(RESULT_DIR / "submit_{}.csv".format(now), index=False)
 
 
-class XgbHomeService(HomeServiceDataHandle):
+class XgbHomeService(BaseModelHomeService):
     algo = 'xgboost'
 
+    # Common params for Xgboost
+    common_params = {
+        "silent": True,
+        "nthreads": 16,
+        "objective": "binary:logistic",
+        # 'is_unbalance': 'true',  #because training data is unbalance (replaced with scale_pos_weight)
+        "scale_pos_weight": 0.33,  # used only in binary application, weight of labels with positive class
+        "eval_metric": "auc",
+    }
     # https://www.analyticsvidhya.com/blog/2016/03/complete-guide-parameter-tuning-xgboost-with-codes-python/
     params_best_fit = {
-        "nthread": 4,
         "booster": "gbtree",
-        "objective": "binary:logistic",
-        "eval_metric": "error",
-        "max_depth": 10,
-        "eta": 0.1,  # analogous to learning_rate
+        "max_depth": 12,
+        "learning_rate": 0.04,
         # "gamma": 0.015,
         # "subsample": max(min(subsample, 1), 0),
         # "colsample_bytree": max(min(colsample_bytree, 1), 0),
         # "min_child_weight": min_child_weight,
         # "max_delta_step": int(max_delta_step),
-        "silent": True,
+        **common_params,
     }
 
-    def validate(self, **kwargs):
+    int_params = ()
+    float_params = ()
+    hypertuning_space = {}
+
+    def validate(self, save_model=True, **kwargs):
         dtrain, dtest = self.get_train_valid_set(as_xgb_dmatrix=True)
         watchlist = [(dtrain, "train"), (dtest, "eval")]
 
         booster = xgb.train(
             params=self.params_best_fit,
-            # feval=my_xgb_roc_auc_score,
-            maximize=True,  # whether to maximize feval
             dtrain=dtrain,
             evals=watchlist,
             **kwargs,
         )
+
+        if save_model:
+            self.save_model(booster)
         return booster
 
-    def cv(self, nfolds=5, **kwargs):
+    def cv(self, params_model=None, nfolds=5,
+           num_boost_round=10000, early_stopping_rounds=100,
+           generate_plot=False, **kwargs):
+
+        # If no params_model is given, take self.params_best_fit
+        if params_model is None:
+            params_model = self.params_best_fit
+
         dtrain = self.get_train_set(as_xgb_dmatrix=True)
-        return xgb.cv(params=self.params_best_fit, dtrain=dtrain, **kwargs)
+        eval_hist = xgb.cv(
+            params=params_model,
+            dtrain=dtrain,
+            verbose_eval=True,
+            show_stdv=True,
+            num_boost_round=num_boost_round,
+            early_stopping_rounds=early_stopping_rounds,
+            **kwargs)
+
+        if generate_plot:
+            self._generate_plot(eval_hist)
+
+        return eval_hist
+
+
+class CatBoostHomService(BaseModelHomeService):
+    algo = 'catboost'
+
+    common_params = {
+        "thread_count": 16,
+        "objective": "CrossEntreopy",
+        "eval_metric": "AUC",
+        "scale_pos_weight": 0.33,  # used only in binary application, weight of labels with positive class
+    }
+
+    params_best_fit = {
+        "max_depth": 12,
+        "learning_rate": 0.04,
+        **common_params,
+    }
+
+    int_params = ()
+    float_params = ()
+    hypertuning_space = {}
+
+    def validate(self, save_model=True, **kwargs):
+        dtrain, dtest = self.get_train_valid_set()
+        watchlist = [(dtrain, "train"), (dtest, "eval")]
+
+        booster = cgb.train(
+            params=self.params_best_fit,
+            dtrain=dtrain,
+            evals=watchlist,
+            **kwargs,
+        )
+
+        if save_model:
+            self.save_model(booster)
+        return booster
+
+    def cv(self, params_model=None, nfolds=5,
+           num_boost_round=10000, early_stopping_rounds=100,
+           generate_plot=False, **kwargs):
+
+        # If no params_model is given, take self.params_best_fit
+        if params_model is None:
+            params_model = self.params_best_fit
+
+        dtrain = self.get_train_set()
+        eval_hist = cgb.cv(
+            params=params_model,
+            dtrain=dtrain,
+            verbose_eval=True,
+            show_stdv=True,
+            num_boost_round=num_boost_round,
+            early_stopping_rounds=early_stopping_rounds,
+            **kwargs)
+
+        if generate_plot:
+            self._generate_plot(eval_hist)
+
+        return eval_hist
