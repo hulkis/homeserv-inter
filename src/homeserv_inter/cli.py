@@ -4,7 +4,7 @@ import pandas as pd
 
 from homeserv_inter.constants import DATA_DIR, RAW_DATA_DIR, NUMERIC_COLS, STR_COLS
 from homeserv_inter.datahandler import generate_cleaned_sets
-from homeserv_inter.model import LgbHomeService, XgbHomeService
+from homeserv_inter.model import LgbHomeService, XgbHomeService, CatBoostHomService
 from homeserv_inter.geo import GeocoderHomeserv
 from wax_toolbox import Timer
 
@@ -176,5 +176,6 @@ def main():
             "geo": GeocoderHomeserv,
             "lgb": LgbHomeService,
             "xgb": XgbHomeService,
+            "cgb": CatBoostHomService,
         }
     )

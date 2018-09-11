@@ -305,7 +305,7 @@ class CatBoostHomService(BaseModelHomeService):
 
     common_params = {
         "thread_count": 16,
-        "objective": "CrossEntreopy",
+        "objective": "Logloss",
         "eval_metric": "AUC",
         "scale_pos_weight": 0.33,  # used only in binary application, weight of labels with positive class
     }
@@ -321,13 +321,13 @@ class CatBoostHomService(BaseModelHomeService):
     hypertuning_space = {}
 
     def validate(self, save_model=True, **kwargs):
-        dtrain, dtest = self.get_train_valid_set()
-        watchlist = [(dtrain, "train"), (dtest, "eval")]
+        dtrain, dtest = self.get_train_valid_set(as_cgb_pool=True)
+        watchlist = [dtrain, dtest]
 
         booster = cgb.train(
-            params=self.params_best_fit,
             dtrain=dtrain,
-            evals=watchlist,
+            params=self.params_best_fit,
+            eval_set=watchlist,
             **kwargs,
         )
 
@@ -335,7 +335,7 @@ class CatBoostHomService(BaseModelHomeService):
             self.save_model(booster)
         return booster
 
-    def cv(self, params_model=None, nfolds=5,
+    def cv(self, params_model=None, nfold=5,
            num_boost_round=10000, early_stopping_rounds=100,
            generate_plot=False, **kwargs):
 
@@ -343,12 +343,12 @@ class CatBoostHomService(BaseModelHomeService):
         if params_model is None:
             params_model = self.params_best_fit
 
-        dtrain = self.get_train_set()
+        dtrain = self.get_train_set(as_cgb_pool=True)
         eval_hist = cgb.cv(
             params=params_model,
             dtrain=dtrain,
+            nfold=nfold,
             verbose_eval=True,
-            show_stdv=True,
             num_boost_round=num_boost_round,
             early_stopping_rounds=early_stopping_rounds,
             **kwargs)
