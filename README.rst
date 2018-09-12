@@ -116,10 +116,12 @@ We clearly go a problem of overfitting. So let's tweak some parameters, includin
 
 .. code:: bash
 
-  .. code:: bash
-
   > homeserv xgb cv --debug=False --num-boost-round=10000 --early-stopping-rounds=100
   # [1345]  train-auc:0.913558+0.025246     test-auc:0.751689+0.00148283
+
+  >  homeserv cgb validate --debug=False --num-boost-round=10000 --early-stopping-rounds=100 --drop-lowimp-features=True
+  # 3052:   test: 0.9526795 best: 0.9526795 (3052)  test1: 0.7497151        total: 3h 26m 17s       remaining: 7h 49m 25s
+
 
 
 Refs
