@@ -79,7 +79,7 @@ Results
     # Public score: 0.7348420163  # using 100% datas for train
 
 
-  - On tag v0.0.5:
+- On tag v0.0.5:
 
   .. code:: bash
 
@@ -94,12 +94,11 @@ Results
     # Public score: 0.7314051236
 
 
-  - On tag v0.0.6:
+- On tag v0.0.6:
 
-  -> Adding onehot encoded features
-  Do not better lightgbm with gbdt
-  We clearly go a problem of overfitting.
-  So let's tweak some parameters, including algorithm used: go for Dart !
+-> Adding onehot encoded features. Do not better lightgbm with gbdt.
+
+We clearly go a problem of overfitting. So let's tweak some parameters, including algorithm used: go for Dart !
 
   .. code:: bash
 
@@ -108,6 +107,21 @@ Results
 
     > homeserv lgb generate-submit --debug=False --num-boost-round=3400 --drop-lowimp-features=True
     # Public socre: 0.7381142213
+
+    > homeserv lgb generate-submit --debug=False --num-boost-round=4100 --drop-lowimp-features=True
+    # Public socre: 0.7374740839
+
+
+- On tag v0.0.7:
+
+.. code:: bash
+
+  > homeserv xgb cv --debug=False --num-boost-round=10000 --early-stopping-rounds=100
+  # [1345]  train-auc:0.913558+0.025246     test-auc:0.751689+0.00148283
+
+  >  homeserv cgb validate --debug=False --num-boost-round=10000 --early-stopping-rounds=100 --drop-lowimp-features=True
+  # 3052:   test: 0.9526795 best: 0.9526795 (3052)  test1: 0.7497151        total: 3h 26m 17s       remaining: 7h 49m 25s
+
 
 
 Refs
