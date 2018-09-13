@@ -158,9 +158,9 @@ class HomeServiceRaw:
              df_interv, df_nature_codes) = self.read_all()
 
         with Timer("Merging all train set"):
-            train_data = self.merge_them_all(df_interv, df_orga, df_equipement,
-                                             df_contract_history,
-                                             *df_nature_codes)
+            train_data = self._merge_them_all(
+                df_interv, df_orga, df_equipement, df_contract_history,
+                *df_nature_codes)
             for col in STR_COLS:
                 train_data[col] = train_data[col].astype(str)
             for col in NUMERIC_COLS + ["target"]:
@@ -175,9 +175,9 @@ class HomeServiceRaw:
         train_data.to_parquet(pathfile, compression="gzip", engine=self.engine)
 
         with Timer("Merging all test set"):
-            test_data = self.merge_them_all(df_intervention_test, df_orga,
-                                            df_equipement, df_contract_history,
-                                            *df_nature_codes)
+            test_data = self._merge_them_all(
+                df_intervention_test, df_orga, df_equipement,
+                df_contract_history, *df_nature_codes)
             for col in STR_COLS:
                 test_data[col] = test_data[col].astype(str)
                 for col in NUMERIC_COLS:
