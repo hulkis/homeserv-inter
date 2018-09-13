@@ -4,13 +4,13 @@ from homeserv_inter.constants import DATA_DIR, NUMERIC_COLS, RAW_DATA_DIR, STR_C
 from wax_toolbox import Timer
 
 
-class HomeServiceRaw:
-    @staticmethod
-    def to_datetimes(dt_cols, df):
-        for col in dt_cols:
-            df[col] = pd.to_datetime(df[col])
-        return df
+def to_datetimes(dt_cols, df):
+    for col in dt_cols:
+        df[col] = pd.to_datetime(df[col])
+    return df
 
+
+class HomeServiceRaw:
     def __init__(self, use_full_history=False, engine="pyarrow"):
         self.use_full_history = use_full_history
         self.engine = engine
