@@ -39,6 +39,9 @@ class HomeServiceRaw:
         data = data.dropna(subset=['target_td'])
         data['target'] = (data['target_td'] <= sixmonth).astype(int)
 
+        # Convert to number of days:
+        data['target_td'] = data['target_td'].dt.days
+
         data = data.merge(df_equipement, how="left", on="INSTANCE_ID")
         data = data.merge(
             df_orga, how="left",
