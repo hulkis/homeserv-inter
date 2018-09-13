@@ -151,7 +151,7 @@ class HomeServiceRaw:
         return (df_orga, df_equipement, df_contract_history,
                 df_intervention_test, df_interv, df_nature_codes)
 
-    def convert_raw(self):
+    def convert(self):
 
         with Timer('-----Reading all csv-----', at_enter=True):
             (df_orga, df_equipement, df_contract_history, df_intervention_test,
@@ -186,4 +186,3 @@ class HomeServiceRaw:
                     pathfile = DATA_DIR / "test.parquet.gzip"
                     test_data.to_parquet(
                         pathfile, compression="gzip", engine=self.engine)
-
