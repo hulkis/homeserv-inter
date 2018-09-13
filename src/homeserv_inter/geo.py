@@ -145,12 +145,12 @@ class GeocoderHomeserv:
         # Clients
         fcache_name = '{}_{}set_geocodes_{}.pkl'.format(
             'VILLE_CLIENT', self.dataset, self.source)
-        _df = pd.read_pickle(fcache_name)
+        _df = pd.read_pickle(DATA_DIR / fcache_name)
 
         # L2 organization
         fcache_name = '{}_{}set_geocodes_{}.pkl'.format(
             'VILLE_L2', self.dataset, self.source)
-        __df = pd.read_pickle(fcache_name)
+        __df = pd.read_pickle(DATA_DIR / fcache_name)
 
         print('Merging data...')
         df = df.merge(_df, on=['VILLE', 'PAYS'], how='outer')
