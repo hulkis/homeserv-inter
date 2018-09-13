@@ -118,7 +118,7 @@ class LgbHomeService(BaseModelHomeService):
     # Common params for LightGBM
     common_params = {
         "verbose": -1,
-        "nthreads": 16,
+        "nthreads": 15,
         # 'is_unbalance': 'true',  #because training data is unbalance (replaced with scale_pos_weight)
         "scale_pos_weight": 0.33,  # used only in binary application, weight of labels with positive class
         "objective": "xentropy",  # better optimize on cross-entropy loss for auc
@@ -142,7 +142,7 @@ class LgbHomeService(BaseModelHomeService):
         # 'subsample_for_bin': 200000,  # Number of samples for constructing bin
         # 'min_split_gain': 0,  # lambda_l1, lambda_l2 and min_gain_to_split to regularization
         # 'reg_alpha': 0,  # L1 regularization term on weights
-        'reg_lambda': 0.2,  # L2 regularization term on weights
+        'reg_lambda': 0.01,  # L2 regularization term on weights
         **common_params,
     }
 
@@ -246,8 +246,8 @@ class XgbHomeService(BaseModelHomeService):
     # https://www.analyticsvidhya.com/blog/2016/03/complete-guide-parameter-tuning-xgboost-with-codes-python/
     params_best_fit = {
         "booster": "gbtree",
-        "max_depth": 12,
-        "learning_rate": 0.04,
+        "max_depth": 16,
+        "learning_rate": 0.02,
         # "gamma": 0.015,
         # "subsample": max(min(subsample, 1), 0),
         # "colsample_bytree": max(min(colsample_bytree, 1), 0),
