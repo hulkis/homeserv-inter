@@ -6,6 +6,7 @@ import googlemaps
 import numpy as np
 import pandas as pd
 from geopy.extra.rate_limiter import RateLimiter
+from geopy import GoogleV3, distance
 from tqdm import tqdm
 
 from homeserv_inter.constants import DATA_DIR
@@ -30,6 +31,7 @@ class GeocoderHomeserv:
 
     def __init__(self,
                  dataset,
+                 debug=False,
                  source='openstreet',
                  token=os.getenv('GOOGLE_MAPS_TOKEN')):
         """
@@ -39,6 +41,7 @@ class GeocoderHomeserv:
         """
         self.source = source
         self.dataset = dataset
+        self.debug = debug
 
         if source == 'gmaps' and token is None:
             raise Exception('You choosed gmaps API but have no token.')
@@ -85,49 +88,139 @@ class GeocoderHomeserv:
         with Timer('Stored in {}'.format(fcache_name)):
             df.to_pickle(DATA_DIR / fcache_name)
 
+    def get_distances(self, force_download=False):
+        if force_download:
+            self._get_coordinates_clients()
 
-def generate_distance_matrix(dataset, token=os.getenv('GOOGLE_MAPS_TOKEN')):
-    if token is None:
-        raise Exception('I need a gmap token!')
+        self._merge_coordinates()
 
-    gmaps = googlemaps.Client(key=token)
+    def _get_coordinates_clients(self):
 
-    with Timer("Reading {} set".format(dataset)):
-        df = pd.read_parquet(DATA_DIR / "{}.parquet.gzip".format(dataset))
+        print('Reading dataset...')
+        with Timer("Reading {} set".format(self.dataset)):
+            df = pd.read_parquet(
+                DATA_DIR / "{}.parquet.gzip".format(self.dataset))
 
-    df = compute_address(df)
+            if self.debug:
+                df = df.sample(100, random_state=1234)
 
-    total_size = df.shape[0]
-    cols = [
-        'distance_l2_particulier_meters', 'duration_l2_particulier_seconds'
-    ]
+        g = self.geolocator
 
-    with Timer('Requesting Google API', at_enter=True):
-        for i, row in df.iterrows():
-            addpart = row['address_particulier']
-            addl2 = row['address_l2_orga']
-            msg = '{}% --> from {} to {}'.format(i // total_size, addpart,
-                                                 addl2)
-            with Timer(msg):
-                try:
-                    res = gmaps.distance_matrix(
-                        origins=addl2, destinations=addpart)
-                    if len(res['rows']) != 1 and len(
-                            res['rows'][0]['elements']) != 1:
-                        logger.debug(res)
-                    res = res['rows'][0]['elements'][0]
-                    df.loc[i, 'distance_l2_particulier_meters'] = res[
-                        'distance']['value']
-                    df.loc[i, 'duration_l2_particulier_seconds'] = res[
-                        'duration']['value']
-                except:
-                    df.loc[i, 'distance_l2_particulier_meters'] = np.nan
-                    df.loc[i, 'duration_l2_particulier_seconds'] = np.nan
+        # Clients
+        _df = df.drop_duplicates(subset=['VILLE', 'PAYS'])
 
-            if i != 0 and i % 100 == 0:
-                fcache_name = 'INCOMPLETE_{}set_distances_gmap_apis.csv'.format(
-                    dataset)
-                with Timer('-------- Caching in {}'.format(fcache_name)):
-                    df[cols].to_csv(DATA_DIR / fcache_name)
+        def _bar(row):
+            return g.geocode({'city': row['VILLE'], 'country': row['PAYS']})
 
-    df[cols].to_csv(DATA_DIR / '{}_distances_gmap_apis.csv'.format(dataset))
+        print('Starting to load clients coordinates...')
+        _df['LONG_LAT_CLIENT'] = _df.apply(_bar, axis=1)
+
+        print('Saving clients coordinates...')
+        fcache_name = '{}_{}set_geocodes_{}.pkl'.format(
+            'VILLE_CLIENT', self.dataset, self.source)
+        with Timer('Stored in {}'.format(fcache_name)):
+            df.to_pickle(DATA_DIR / fcache_name)
+
+        # L2 organization
+        __df = df.drop_duplicates(subset=['L2_ORGA_VILLE'])
+
+        def _foo(row):
+            print({'city': row['L2_ORGA_VILLE'], 'country': 'FR'})
+            return g.geocode({'city': row['L2_ORGA_VILLE'], 'country': 'FR'})
+        print('Starting to load L2 coordinates...')
+        __df['LONG_LAT_L2'] = _df.apply(_foo, axis=1)
+
+        print('Saving L2 coordinates...')
+        fcache_name = '{}_{}set_geocodes_{}.pkl'.format(
+            'VILLE_L2', self.dataset, self.source)
+        with Timer('Stored in {}'.format(fcache_name)):
+            df.to_pickle(DATA_DIR / fcache_name)
+
+    def _merge_coordinates(self):
+
+        with Timer("Reading {} set".format(self.dataset)):
+            df = pd.read_parquet(
+                DATA_DIR / "{}.parquet.gzip".format(self.dataset))
+
+        # Clients
+        fcache_name = '{}_{}set_geocodes_{}.pkl'.format(
+            'VILLE_CLIENT', self.dataset, self.source)
+        _df = pd.read_pickle(fcache_name)
+
+        # L2 organization
+        fcache_name = '{}_{}set_geocodes_{}.pkl'.format(
+            'VILLE_L2', self.dataset, self.source)
+        __df = pd.read_pickle(fcache_name)
+
+        print('Merging data...')
+        df = df.merge(_df, on=['VILLE', 'PAYS'], how='outer')
+        df = df.merge(__df, on=['L2_ORGA_VILLE'], how='outer')
+
+        def _foo(row):
+            try:
+                dist = distance.distance(
+                    distance.lonlat(*row['LONG_LAT_CLIENT']), distance.lonlat(*row['LONG_LAT_L2'])
+                )
+            except:
+                dist = np.nan
+
+            return dist
+
+        print('Computing distances...')
+        df['DIST_CLIENT_L2'] = df.apply(_foo, axis=1)
+
+        print('Saving distances...')
+        fcache_name = '{}_{}set_geocodes_{}.pkl'.format(
+            'DISTANCE', self.dataset, self.source)
+        with Timer('Stored in {}'.format(fcache_name)):
+            df.to_pickle(DATA_DIR / fcache_name)
+
+
+
+
+
+# def generate_distance_matrix(dataset, token=os.getenv('GOOGLE_MAPS_TOKEN')):
+#     if token is None:
+#         raise Exception('I need a gmap token!')
+#
+#     gmaps = googlemaps.Client(key=token)
+#
+#     with Timer("Reading {} set".format(dataset)):
+#         df = pd.read_parquet(DATA_DIR / "{}.parquet.gzip".format(dataset))
+#
+#     df = GeocoderHomeserv.compute_address(df)
+#
+#     total_size = df.shape[0]
+#     cols = [
+#         'distance_l2_particulier_meters', 'duration_l2_particulier_seconds'
+#     ]
+#
+#     with Timer('Requesting Google API', at_enter=True):
+#         for i, row in df.iterrows():
+#             addpart = row['address_particulier']
+#             addl2 = row['address_l2_orga']
+#             msg = '{}% --> from {} to {}'.format(i // total_size, addpart,
+#                                                  addl2)
+#             with Timer(msg):
+#                 try:
+#                     res = gmaps.distance_matrix(
+#                         origins=addl2, destinations=addpart)
+#                     if len(res['rows']) != 1 and len(
+#                             res['rows'][0]['elements']) != 1:
+#                         logger.debug(res)
+#                     res = res['rows'][0]['elements'][0]
+#                     df.loc[i, 'distance_l2_particulier_meters'] = res[
+#                         'distance']['value']
+#                     df.loc[i, 'duration_l2_particulier_seconds'] = res[
+#                         'duration']['value']
+#                 except:
+#                     df.loc[i, 'distance_l2_particulier_meters'] = np.nan
+#                     df.loc[i, 'duration_l2_particulier_seconds'] = np.nan
+#
+#             if i != 0 and i % 100 == 0:
+#                 fcache_name = 'INCOMPLETE_{}set_distances_gmap_apis.csv'.format(
+#                     dataset)
+#                 with Timer('-------- Caching in {}'.format(fcache_name)):
+#                     df[cols].to_csv(DATA_DIR / fcache_name)
+#
+#     df[cols].to_csv(DATA_DIR / '{}_distances_gmap_apis.csv'.format(dataset))

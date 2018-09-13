@@ -4,6 +4,7 @@ pyyaml
 # Tools
 wax-toolbox
 fire
+tqdm
 
 # ML:
 pandas

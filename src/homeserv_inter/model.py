@@ -115,7 +115,7 @@ class LgbHomeService(BaseModelHomeService):
     params_best_fit = {
         # "task": "train",
         "boosting_type": "dart",
-        "learning_rate": 0.04,
+        "learning_rate": 0.02,
         "num_leaves": 100,  # we should let it be smaller than 2^(max_depth)
         "min_data_in_leaf": 20,  # Minimum number of data need in a child
         "max_depth": -1,  # -1 means no limit
@@ -128,7 +128,7 @@ class LgbHomeService(BaseModelHomeService):
         # 'subsample_for_bin': 200000,  # Number of samples for constructing bin
         # 'min_split_gain': 0,  # lambda_l1, lambda_l2 and min_gain_to_split to regularization
         # 'reg_alpha': 0,  # L1 regularization term on weights
-        # 'reg_lambda': 0,  # L2 regularization term on weights
+        'reg_lambda': 0.2,  # L2 regularization term on weights
         **common_params,
     }
 
