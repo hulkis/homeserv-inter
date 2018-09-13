@@ -214,18 +214,16 @@ class HomeServiceRaw:
             numeric_cols = set(NUMERIC_COLS).intersection(set(train_data.columns.tolist()))
             for col in numeric_cols:
                 train_data[col] = pd.to_numeric(
-                    train_data[col], downcast='signed')
+                    train_data[col], downcast='signed', errors='coerce')
 
             if 'target' in train_data:
                 train_data[col] = pd.to_numeric(
-                    train_data[col], downcast='signed')
+                    train_data[col], downcast='signed', errors='coerce')
 
         if self.use_full_history:
             pathfile = DATA_DIR / "fullhist_train.parquet.gzip"
         else:
             pathfile = DATA_DIR / "train.parquet.gzip"
-
-        __import__('IPython').embed()  # Enter Ipython
 
         with Timer('Saving into {}'.format(pathfile)):
             train_data.to_parquet(
@@ -245,7 +243,7 @@ class HomeServiceRaw:
             numeric_cols = set(NUMERIC_COLS).intersection(set(train_data.columns.tolist()))
             for col in numeric_cols:
                 test_data[col] = pd.to_numeric(
-                    test_data[col], downcast='signed')
+                    test_data[col], downcast='signed', errors='coerce')
 
         pathfile = DATA_DIR / "test.parquet.gzip"
         with Timer('Saving into {}'.format(pathfile)):
