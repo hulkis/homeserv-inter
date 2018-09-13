@@ -1,5 +1,4 @@
 import pandas as pd
-
 from homeserv_inter.constants import DATA_DIR, NUMERIC_COLS, RAW_DATA_DIR, STR_COLS
 from wax_toolbox import Timer
 
@@ -15,8 +14,52 @@ class HomeServiceRaw:
         self.use_full_history = use_full_history
         self.engine = engine
 
+    def _merge_them_all_with_full_history(self, data, df_orga, df_equipement,
+                                          df_contract_history,
+                                          *df_nature_codes):
+
+        data = data.merge(df_contract_history, how="left", on="INSTANCE_ID")
+
+        subset = ['CONTRACT_NUMBER', 'INSTANCE_ID', 'CRE_DATE_GZL']
+        data = data.dropna(subset=subset)
+        data = data.drop_duplicates(keep='first', subset=subset)
+
+        # Ordering before processing
+        data = data.sort_values(['CONTRACT_NUMBER','CRE_DATE_GZL'])
+        data = data.reset_index(drop=True)
+
+        # Some initializations
+        gp = data.groupby(['CONTRACT_NUMBER'])
+        target = pd.DataFrame()
+        sixmonth = pd.Timedelta(days=30*6)
+
+        with Timer('Reconstructing targets', at_enter=True):
+            data['target_td'] = data.groupby('CONTRACT_NUMBER')['CRE_DATE_GZL'].diff(-1) * (-1)
+
+        data = data.dropna(subset=['target_td'])
+        data['target'] = (data['target_td'] <= sixmonth).astype(int)
+
+        data = data.merge(df_equipement, how="left", on="INSTANCE_ID")
+        data = data.merge(
+            df_orga, how="left",
+            left_on="ORGANISATION_ID",
+            right_on="L2_ORGANISATION_ID",
+        )
+
+        # Merging with all nature codes:
+        for df in df_nature_codes:
+            data = data.merge(df, how="left")
+
+        return data
+
     def _merge_them_all(self, data, df_orga, df_equipement,
                         df_contract_history, *df_nature_codes):
+
+        if self.use_full_history:
+            return self._merge_them_all_with_full_history(
+                data, df_orga, df_equipement, df_contract_history,
+                *df_nature_codes)
+
         data = data.merge(df_equipement, how="left", on="INSTANCE_ID")
         data = data.merge(
             df_orga,
@@ -157,15 +200,22 @@ class HomeServiceRaw:
             (df_orga, df_equipement, df_contract_history, df_intervention_test,
              df_interv, df_nature_codes) = self.read_all()
 
-        with Timer("Merging all train set"):
+        with Timer("-----Merging all train set-----", at_enter=True):
             train_data = self._merge_them_all(
                 df_interv, df_orga, df_equipement, df_contract_history,
                 *df_nature_codes)
-            for col in STR_COLS:
+
+            # Str cols
+            str_cols = set(STR_COLS).intersection(set(train_data.columns.tolist()))
+            for col in str_cols:
                 train_data[col] = train_data[col].astype(str)
-            for col in NUMERIC_COLS:
+
+            # Numeric cols
+            numeric_cols = set(NUMERIC_COLS).intersection(set(train_data.columns.tolist()))
+            for col in numeric_cols:
                 train_data[col] = pd.to_numeric(
                     train_data[col], downcast='signed')
+
             if 'target' in train_data:
                 train_data[col] = pd.to_numeric(
                     train_data[col], downcast='signed')
@@ -175,21 +225,29 @@ class HomeServiceRaw:
         else:
             pathfile = DATA_DIR / "train.parquet.gzip"
 
+        __import__('IPython').embed()  # Enter Ipython
+
         with Timer('Saving into {}'.format(pathfile)):
             train_data.to_parquet(
                 pathfile, compression="gzip", engine=self.engine)
 
-        with Timer("Merging all test set"):
+        with Timer("-----Merging all test set-----", at_enter=True):
             test_data = self._merge_them_all(
                 df_intervention_test, df_orga, df_equipement,
                 df_contract_history, *df_nature_codes)
-            for col in STR_COLS:
+
+            # Str cols
+            str_cols = set(STR_COLS).intersection(set(train_data.columns.tolist()))
+            for col in str_cols:
                 test_data[col] = test_data[col].astype(str)
-            for col in NUMERIC_COLS:
+
+            # Numeric cols
+            numeric_cols = set(NUMERIC_COLS).intersection(set(train_data.columns.tolist()))
+            for col in numeric_cols:
                 test_data[col] = pd.to_numeric(
                     test_data[col], downcast='signed')
-            pathfile = DATA_DIR / "test.parquet.gzip"
 
+        pathfile = DATA_DIR / "test.parquet.gzip"
         with Timer('Saving into {}'.format(pathfile)):
             test_data.to_parquet(
                 pathfile, compression="gzip", engine=self.engine)
