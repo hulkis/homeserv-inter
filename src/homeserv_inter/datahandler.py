@@ -5,6 +5,7 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 import xgboost as xgb
+import catboost as cgb
 from sklearn import model_selection, preprocessing
 
 from homeserv_inter.constants import (
@@ -235,7 +236,8 @@ class HomeServiceDataHandle:
 
         return df
 
-    def get_train_set(self, as_xgb_dmatrix=False, as_lgb_dataset=False):
+    def get_train_set(self, as_xgb_dmatrix=False, as_lgb_dataset=False,
+                      as_cgb_pool=False):
         df = self._get_cleaned_single_set(dataset="train")
         train_cols = df.columns.tolist()
         train_cols.remove("target")
@@ -247,16 +249,19 @@ class HomeServiceDataHandle:
             ]
 
         if as_xgb_dmatrix:
-            return xgb.DMatrix(df[train_cols], df[["target"]]),
+            return xgb.DMatrix(data=df[train_cols], label=df[["target"]])
         elif as_lgb_dataset:
             return lgb.Dataset(df[train_cols], df[["target"]].values.ravel())
+        elif as_cgb_pool:
+            return cgb.Pool(df[train_cols], df[["target"]])
         else:
             return df[train_cols], df[["target"]]
 
     def get_train_valid_set(self,
                             split_perc=0.2,
                             as_xgb_dmatrix=False,
-                            as_lgb_dataset=False):
+                            as_lgb_dataset=False,
+                            as_cgb_pool=False):
         df = self._get_cleaned_single_set(dataset="train")
 
         if self.drop_lowimp_features:
@@ -280,6 +285,11 @@ class HomeServiceDataHandle:
             return (
                 lgb.Dataset(Xtrain, ytrain.values.ravel()),
                 lgb.Dataset(Xtest, ytest.values.ravel()),
+            )
+        elif as_cgb_pool:
+            return (
+                cgb.Pool(Xtrain, ytrain),
+                cgb.Pool(Xtest, ytest)
             )
         else:
             return Xtrain, Xtest, ytrain, ytest

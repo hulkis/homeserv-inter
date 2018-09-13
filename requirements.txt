@@ -12,7 +12,7 @@ pyarrow
 sklearn
 numpy
 
-xgboost
+xgboost==0.72.1
 lightgbm
 catboost
 
