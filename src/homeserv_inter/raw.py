@@ -142,7 +142,7 @@ class HomeServiceRaw:
 
         if not self.use_full_history:
             with Timer("Reading intervention_train.csv"):
-                df_interv = self.read_intervention_test()
+                df_interv = self.read_intervention_train()
         else:
             with Timer("Reading intervention_history.csv"):
                 df_interv = self.read_intervention_history()
@@ -175,7 +175,9 @@ class HomeServiceRaw:
         else:
             pathfile = DATA_DIR / "train.parquet.gzip"
 
-        train_data.to_parquet(pathfile, compression="gzip", engine=self.engine)
+        with Timer('Saving into {}'.format(pathfile)):
+            train_data.to_parquet(
+                pathfile, compression="gzip", engine=self.engine)
 
         with Timer("Merging all test set"):
             test_data = self._merge_them_all(
@@ -187,5 +189,7 @@ class HomeServiceRaw:
                 test_data[col] = pd.to_numeric(
                     test_data[col], downcast='signed')
             pathfile = DATA_DIR / "test.parquet.gzip"
+
+        with Timer('Saving into {}'.format(pathfile)):
             test_data.to_parquet(
                 pathfile, compression="gzip", engine=self.engine)
