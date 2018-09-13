@@ -119,13 +119,13 @@ class GeocoderHomeserv:
         fcache_name = '{}_{}set_geocodes_{}.pkl'.format(
             'VILLE_CLIENT', self.dataset, self.source)
         with Timer('Stored in {}'.format(fcache_name)):
-            df.to_pickle(DATA_DIR / fcache_name)
+            _df.to_pickle(DATA_DIR / fcache_name)
 
         # L2 organization
         __df = df.drop_duplicates(subset=['L2_ORGA_VILLE'])
 
         def _foo(row):
-            print({'city': row['L2_ORGA_VILLE'], 'country': 'FR'})
+            # print({'city': row['L2_ORGA_VILLE'], 'country': 'FR'})
             return g.geocode({'city': row['L2_ORGA_VILLE'], 'country': 'FR'})
         print('Starting to load L2 coordinates...')
         __df['LONG_LAT_L2'] = _df.apply(_foo, axis=1)
@@ -134,13 +134,16 @@ class GeocoderHomeserv:
         fcache_name = '{}_{}set_geocodes_{}.pkl'.format(
             'VILLE_L2', self.dataset, self.source)
         with Timer('Stored in {}'.format(fcache_name)):
-            df.to_pickle(DATA_DIR / fcache_name)
+            __df.to_pickle(DATA_DIR / fcache_name)
 
     def _merge_coordinates(self):
 
         with Timer("Reading {} set".format(self.dataset)):
             df = pd.read_parquet(
                 DATA_DIR / "{}.parquet.gzip".format(self.dataset))
+
+            if self.debug:
+                df = df.sample(100, random_state=1234)
 
         # Clients
         fcache_name = '{}_{}set_geocodes_{}.pkl'.format(
@@ -153,8 +156,8 @@ class GeocoderHomeserv:
         __df = pd.read_pickle(DATA_DIR / fcache_name)
 
         print('Merging data...')
-        df = df.merge(_df, on=['VILLE', 'PAYS'], how='outer')
-        df = df.merge(__df, on=['L2_ORGA_VILLE'], how='outer')
+        df = df.merge(_df[['LONG_LAT_CLIENT', 'VILLE', 'PAYS']], on=['VILLE', 'PAYS'], how='outer')
+        df = df.merge(__df[['LONG_LAT_L2', 'L2_ORGA_VILLE']], on=['L2_ORGA_VILLE'], how='outer')
 
         def _foo(row):
             try:
