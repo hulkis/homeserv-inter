@@ -163,7 +163,10 @@ class HomeServiceRaw:
                 *df_nature_codes)
             for col in STR_COLS:
                 train_data[col] = train_data[col].astype(str)
-            for col in NUMERIC_COLS + ["target"]:
+            for col in NUMERIC_COLS:
+                train_data[col] = pd.to_numeric(
+                    train_data[col], downcast='signed')
+            if 'target' in train_data:
                 train_data[col] = pd.to_numeric(
                     train_data[col], downcast='signed')
 
@@ -180,9 +183,9 @@ class HomeServiceRaw:
                 df_contract_history, *df_nature_codes)
             for col in STR_COLS:
                 test_data[col] = test_data[col].astype(str)
-                for col in NUMERIC_COLS:
-                    test_data[col] = pd.to_numeric(
-                        test_data[col], downcast='signed')
-                    pathfile = DATA_DIR / "test.parquet.gzip"
-                    test_data.to_parquet(
-                        pathfile, compression="gzip", engine=self.engine)
+            for col in NUMERIC_COLS:
+                test_data[col] = pd.to_numeric(
+                    test_data[col], downcast='signed')
+            pathfile = DATA_DIR / "test.parquet.gzip"
+            test_data.to_parquet(
+                pathfile, compression="gzip", engine=self.engine)
