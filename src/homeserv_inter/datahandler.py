@@ -148,7 +148,8 @@ def build_features_str(df):
     return df
 
 
-CAT_FEATURES_LIST = [['INSTANCE_ID'], ['RESOURCE_ID'], ['INSTANCE_ID', 'RESOURCE_ID']]
+CAT_FEATURES_LIST = [['INSTANCE_ID'], ['RESOURCE_ID'],
+                     ['INSTANCE_ID', 'RESOURCE_ID']]
 
 
 def build_features(df, include_hist=False):
@@ -179,14 +180,18 @@ def build_features(df, include_hist=False):
 
 
 def build_features_cat(df, filter):
-
     def _mean_delta_interv(df):
-        _df = df.dropna(subset=['SCHEDULED_START_DATE', 'SCHEDULED_END_DATE',
-                                'ACTUAL_START_DATE', 'ACTUAL_END_DATE'],
-                        how='all')
+        _df = df.dropna(
+            subset=[
+                'SCHEDULED_START_DATE', 'SCHEDULED_END_DATE',
+                'ACTUAL_START_DATE', 'ACTUAL_END_DATE'
+            ],
+            how='all')
 
-        d_min = pd.concat([_df['ACTUAL_START_DATE'], _df['SCHEDULED_START_DATE']]).min()
-        d_max = pd.concat([_df['ACTUAL_END_DATE'], _df['SCHEDULED_END_DATE']]).max()
+        d_min = pd.concat(
+            [_df['ACTUAL_START_DATE'], _df['SCHEDULED_START_DATE']]).min()
+        d_max = pd.concat([_df['ACTUAL_END_DATE'],
+                           _df['SCHEDULED_END_DATE']]).max()
 
         n = len(_df)
         if n > 1:
@@ -221,13 +226,15 @@ def _generate_cleaned_single_set(dataset, drop_cols=None, include_hist=False):
 def generate_cleaned_sets(drop_cols=DROPCOLS, include_hist=False):
     """Generate cleaned sets."""
     with Timer("Gen clean trainset", True):
-        df_train = _generate_cleaned_single_set(dataset="train", drop_cols=drop_cols, include_hist=include_hist)
+        df_train = _generate_cleaned_single_set(
+            dataset="train", drop_cols=drop_cols, include_hist=include_hist)
         savepath = CLEANED_DATA_DIR / "{}_cleaned.parquet.gzip".format('train')
         with Timer("Saving into {}".format(savepath)):
             df_train.to_parquet(savepath, compression="gzip")
 
     with Timer("Gen clean testset", True):
-        df_test = _generate_cleaned_single_set(dataset="test", drop_cols=drop_cols, include_hist=False)
+        df_test = _generate_cleaned_single_set(
+            dataset="test", drop_cols=drop_cols, include_hist=False)
 
     if include_hist:
         for cat in CAT_FEATURES_LIST:
@@ -238,9 +245,6 @@ def generate_cleaned_sets(drop_cols=DROPCOLS, include_hist=False):
     savepath = CLEANED_DATA_DIR / "{}_cleaned.parquet.gzip".format('test')
     with Timer("Saving into {}".format(savepath)):
         df_train.to_parquet(savepath, compression="gzip")
-
-
-
 
 
 class HomeServiceDataHandle:
@@ -267,7 +271,7 @@ class HomeServiceDataHandle:
 
         catboost_features = list(
             set(cols).intersection(set(CATBOOST_FEATURES)))
-        other_cols = list(set(cols) - set(catboost_features))
+        other_cols = list(set(df.columns.tolist()) - set(catboost_features))
 
         # Reorder:
         df = df.loc[:, catboost_features + other_cols].copy()
@@ -312,7 +316,8 @@ class HomeServiceDataHandle:
             with Timer('Creating Pool for Test set CatBoost'):
                 df, catboost_features = self._generate_catboost_df(df)
                 idx_cat_features = list(range(len(catboost_features)))
-                pool = cgb.Pool(data=df, label=None, cat_features=idx_cat_features)
+                pool = cgb.Pool(
+                    data=df, label=None, cat_features=idx_cat_features)
             return pool
 
         return df
@@ -339,7 +344,10 @@ class HomeServiceDataHandle:
             with Timer('Creating Pool for Train set CatBoost'):
                 df, catboost_features = self._generate_catboost_df(df)
                 idx_cat_features = list(range(len(catboost_features)))
-                pool = cgb.Pool(df[train_cols], df[["target"]], idx_cat_features)
+                pool = cgb.Pool(
+                    df.drop(columns=["target"]),
+                    df["target"],
+                    idx_cat_features)
             return pool
         else:
             return df[train_cols], df[["target"]]
@@ -376,7 +384,8 @@ class HomeServiceDataHandle:
         elif as_cgb_pool:
             with Timer('Creating Pool for Train&Test set CatBoost'):
                 Xtrain, catboost_features = self._generate_catboost_df(Xtrain)
-                Xtest, catboost_features_bis = self._generate_catboost_df(Xtest)
+                Xtest, catboost_features_bis = self._generate_catboost_df(
+                    Xtest)
                 assert catboost_features == catboost_features_bis
                 idx_cat_features = list(range(len(catboost_features)))
                 pool_train = cgb.Pool(Xtrain, ytrain, idx_cat_features)
