@@ -238,12 +238,12 @@ class HomeServiceRaw:
                 df_contract_history, *df_nature_codes)
 
             # Str cols
-            str_cols = set(STR_COLS).intersection(set(train_data.columns.tolist()))
+            str_cols = set(STR_COLS).intersection(set(test_data.columns.tolist()))
             for col in str_cols:
                 test_data[col] = test_data[col].astype(str)
 
             # Numeric cols
-            numeric_cols = set(NUMERIC_COLS).intersection(set(train_data.columns.tolist()))
+            numeric_cols = set(NUMERIC_COLS).intersection(set(test_data.columns.tolist()))
             for col in numeric_cols:
                 test_data[col] = pd.to_numeric(
                     test_data[col], downcast='signed', errors='coerce')
