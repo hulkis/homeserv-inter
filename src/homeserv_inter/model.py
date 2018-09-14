@@ -387,10 +387,9 @@ class CatBoostHomService(BaseModelHomeService):
 
         with Timer("Predicting"):
             probas = booster.predict(dftest, prediction_type="Probability")
-            pred = pd.DataFrame(probas)[[1]]  # Get proba classe one
-            pred = pred.rename(columns={1: 'target'})
+            dfpred = pd.DataFrame(probas)[[1]]  # Get proba classe one
+            dfpred = dfpred.rename(columns={1: 'target'})
 
-        dfpred = pd.DataFrame({"target": pred})
         now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-Mm")
 
         fpath = RESULT_DIR / "catboost_submit_{}.csv".format(now)
