@@ -38,7 +38,7 @@ DROPCOLS = [
     # seems all important
 
     # 'equipment' table:
-    "INSTANCE_ID",  # primary key
+    # "INSTANCE_ID",  # primary key
     "MARQUE_CODE",  # keep MARQUE_LIB label encoded
     "MODELE_CODE",  # keep MODELE_LIB label encoded
 
