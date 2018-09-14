@@ -79,33 +79,33 @@ def build_features_datetime(df):
 def build_features_str(df):
     # Some Str cleaning:
 
-    # --> FORMULE:
-    # treat 'SECURITE*' & 'SECURITE* 2V' & 'ESSENTIAL CLIENT' as the same
-    r = re.compile('SECURITE.*')
-    df['FORMULE'] = df['FORMULE'].str.replace(r, 'SECURITE')
+    # # --> FORMULE:
+    # # treat 'SECURITE*' & 'SECURITE* 2V' & 'ESSENTIAL CLIENT' as the same
+    # r = re.compile('SECURITE.*')
+    # df['FORMULE'] = df['FORMULE'].str.replace(r, 'SECURITE')
 
-    # treat 'ESSENTIEL P2' & 'ESSENTIEL CLIENT' as the same
-    r = re.compile('ESSENTIEL.*')
-    df['FORMULE'] = df['FORMULE'].str.replace(r, 'ESSENTIEL')
+    # # treat 'ESSENTIEL P2' & 'ESSENTIEL CLIENT' as the same
+    # r = re.compile('ESSENTIEL.*')
+    # df['FORMULE'] = df['FORMULE'].str.replace(r, 'ESSENTIEL')
 
-    # treat 'Sécurité Pack *' as the same
-    r = re.compile('Sécurité Pack.*')
-    df['FORMULE'] = df['FORMULE'].str.replace(r, 'Sécurité Pack')
+    # # treat 'Sécurité Pack *' as the same
+    # r = re.compile('Sécurité Pack.*')
+    # df['FORMULE'] = df['FORMULE'].str.replace(r, 'Sécurité Pack')
 
-    # treat 'TRANQUILITE PRO .*' as nan due to only one register in test set
-    r = re.compile('TRANQUILLITE.*')
-    df['FORMULE'] = df['FORMULE'].replace(
-        r, np.nan)  # no str so that can be np.nan
+    # # treat 'TRANQUILITE PRO .*' as nan due to only one register in test set
+    # r = re.compile('TRANQUILLITE.*')
+    # df['FORMULE'] = df['FORMULE'].replace(
+    #     r, np.nan)  # no str so that can be np.nan
 
-    # --> ORIGINE_INCIDENT:
-    # treat 'Fax' as nan due to only one register in test set
-    df['ORIGINE_INCIDENT'] = df['ORIGINE_INCIDENT'].replace('Fax', np.nan)
+    # # --> ORIGINE_INCIDENT:
+    # # treat 'Fax' as nan due to only one register in test set
+    # df['ORIGINE_INCIDENT'] = df['ORIGINE_INCIDENT'].replace('Fax', np.nan)
 
-    # treat 'Répondeur', 'Mail', 'Internet' as one label: 'indirect_contact'
-    # but still keep 'Courrier' as it is soooo mainstream, those people are old & odd.
-    r = re.compile('(Répondeur)|(Mail)|(Internet)')
-    df['ORIGINE_INCIDENT'] = df['ORIGINE_INCIDENT'].replace(
-        r, 'indirect_contact')
+    # # treat 'Répondeur', 'Mail', 'Internet' as one label: 'indirect_contact'
+    # # but still keep 'Courrier' as it is soooo mainstream, those people are old & odd.
+    # r = re.compile('(Répondeur)|(Mail)|(Internet)')
+    # df['ORIGINE_INCIDENT'] = df['ORIGINE_INCIDENT'].replace(
+    #     r, 'indirect_contact')
 
     # --> INCIDENT_TYPE_NAME
     # Multi Label Binarize & one hot encoder INCIDENT_TYPE_NAME:
@@ -114,25 +114,25 @@ def build_features_str(df):
     # Entretien                 0   1
     # Dépannage+Entretien       1   1
 
-    df['INCIDENT_TYPE_NAME'] = df['INCIDENT_TYPE_NAME'].str.split('+')
-    mlb = preprocessing.MultiLabelBinarizer()
-    df['INCIDENT_TYPE_NAME'] = list(
-        mlb.fit_transform(df['INCIDENT_TYPE_NAME']))
-    dftmp = pd.DataFrame(
-        index=df['INCIDENT_TYPE_NAME'].index,
-        data=df['INCIDENT_TYPE_NAME'].values.tolist()).add_prefix(
-            'INCIDENT_TYPE_NAME_label')
-    df = pd.concat([df.drop(columns=['INCIDENT_TYPE_NAME']), dftmp], axis=1)
+    # df['INCIDENT_TYPE_NAME'] = df['INCIDENT_TYPE_NAME'].str.split('+')
+    # mlb = preprocessing.MultiLabelBinarizer()
+    # df['INCIDENT_TYPE_NAME'] = list(
+    #     mlb.fit_transform(df['INCIDENT_TYPE_NAME']))
+    # dftmp = pd.DataFrame(
+    #     index=df['INCIDENT_TYPE_NAME'].index,
+    #     data=df['INCIDENT_TYPE_NAME'].values.tolist()).add_prefix(
+    #         'INCIDENT_TYPE_NAME_label')
+    # df = pd.concat([df.drop(columns=['INCIDENT_TYPE_NAME']), dftmp], axis=1)
 
-    # Categorical features LabelBinarizer (equivalent to onehotencoding):
-    msg = 'One Hot Encoding for CATEGORICAL_FEATURES with pd.get_dummies'
-    with Timer(msg):
-        for col in CATEGORICAL_FEATURES:
-            df = pd.concat(
-                [pd.get_dummies(df[col], prefix=col),
-                 df.drop(columns=[col])],
-                axis=1,
-            )
+    # # Categorical features LabelBinarizer (equivalent to onehotencoding):
+    # msg = 'One Hot Encoding for CATEGORICAL_FEATURES with pd.get_dummies'
+    # with Timer(msg):
+    #     for col in CATEGORICAL_FEATURES:
+    #         df = pd.concat(
+    #             [pd.get_dummies(df[col], prefix=col),
+    #              df.drop(columns=[col])],
+    #             axis=1,
+    #         )
 
     # Still to do, nlp on nlp_cols, but for the moment take the len of the
     # commentary
@@ -229,13 +229,13 @@ class HomeServiceDataHandle:
         for col in cols:
 
             # Drop if only NaN
-            if df[col].isna().all():
+            if df.loc[:, col].isna().all():
                 df = df.drop(columns=[col])
                 continue
 
-            df[col] = df[col].fillna(df[col].max() + 1)
             # df[col] = pd.to_numeric(df[col], downcast='integer')
-            df[col] = df[col].astype(int)
+            df.loc[:, col] = df.loc[:, col].fillna(
+                df.loc[:, col].max() + 1).astype(int)
         return df
 
     def _get_list_categorical_features(self, df):
@@ -247,6 +247,26 @@ class HomeServiceDataHandle:
 
         lst_idx = [df.columns.get_loc(col) for col in str_cols + ids_cols]
         return lst, lst_idx
+
+    def _gen_catboost_set(self, df):
+        # Get categorical columns present in df
+        cat_cols, _ = self._get_list_categorical_features(df)
+
+        # Fillna & ensure integer type:
+        df_cleaned = self._fillna_labelbin(df, cat_cols)
+
+        # Get categorical columns present in df_cleaned
+        cat_cols, _ = self._get_list_categorical_features(df_cleaned)
+
+        # Reorder
+        new_order_cols = cat_cols + list(
+            set(df_cleaned.columns.tolist()) - set(cat_cols))
+        df_cleaned = df_cleaned[new_order_cols]
+
+        # Get indices
+        cat_cols, cat_indices = self._get_list_categorical_features(df_cleaned)
+
+        return df_cleaned, cat_indices
 
     # Methods to get cleaned datas:
     def _get_cleaned_single_set(self, dataset="train"):
@@ -271,7 +291,7 @@ class HomeServiceDataHandle:
 
         return df
 
-    def get_test_set(self):
+    def get_test_set(self, as_cgb_pool=False, order_cols=None):
         df = self._get_cleaned_single_set(dataset="test")
 
         if self.drop_lowimp_features:
@@ -279,6 +299,16 @@ class HomeServiceDataHandle:
             dropcols = set(df.columns.tolist()).intersection(
                 set(LOW_IMPORTANCE_FEATURES))
             df = df.drop(columns=list(dropcols))
+
+        if not order_cols:
+            order_cols = df.columns.tolist()
+
+        if as_cgb_pool:
+            df_cat, indices = self._gen_catboost_set(df[order_cols])
+            with Timer('Creating Test Pool'):
+                pool = cgb.Pool(df_cat, label=None, cat_features=indices)
+
+            return pool
 
         return df
 
@@ -301,17 +331,13 @@ class HomeServiceDataHandle:
         elif as_lgb_dataset:
             return lgb.Dataset(df[train_cols], df[["target"]].values.ravel())
         elif as_cgb_pool:
-            lst_train, lst_idx_train = self._get_list_categorical_features(df)
-            df_clean = self._fillna_labelbin(df, lst_train)
-            lst_train, lst_idx_train = self._get_list_categorical_features(
-                df_clean.drop(columns=["target"]))
+            df, indices = self._gen_catboost_set(df)
 
             with Timer('Creating Train Pool'):
                 Ptrain = cgb.Pool(
-                    df_clean.drop(columns=["target"]), df_clean[["target"]],
-                    lst_idx_train)
+                    df.drop(columns=["target"]), df[["target"]], indices)
 
-            return Ptrain
+            return Ptrain, df.drop(columns=["target"]).columns.tolist()
         else:
 
             return df[train_cols], df[["target"]]
@@ -347,21 +373,13 @@ class HomeServiceDataHandle:
                 lgb.Dataset(Xtest, ytest.values.ravel()),
             )
         elif as_cgb_pool:
-            lst_train, lst_idx_train = self._get_list_categorical_features(
-                Xtrain)
-            Xtrain_clean = self._fillna_labelbin(Xtrain, lst_train)
-            lst_train, lst_idx_train = self._get_list_categorical_features(
-                Xtrain_clean)
-
-            lst_test, lst_idx_test = self._get_list_categorical_features(Xtest)
-            Xtest_clean = self._fillna_labelbin(Xtest, lst_test)
-            lst_test, lst_idx_test = self._get_list_categorical_features(
-                Xtest_clean)
+            df_train, indices_train = self._gen_catboost_set(Xtrain)
+            df_test, indices_test = self._gen_catboost_set(Xtest)
 
             with Timer('Creating Train Pool'):
-                Ptrain = cgb.Pool(Xtrain_clean, ytrain, lst_idx_train)
+                Ptrain = cgb.Pool(df_train, ytrain, indices_train)
             with Timer('Creating Test Pool'):
-                Ptest = cgb.Pool(Xtest_clean, ytest, lst_idx_test)
+                Ptest = cgb.Pool(df_test, ytest, indices_test)
             return (Ptrain, Ptest)
         else:
             return Xtrain, Xtest, ytrain, ytest
