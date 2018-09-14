@@ -1,16 +1,17 @@
 import pickle
 import re
 
+import catboost as cgb
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-import catboost as cgb
 from sklearn import model_selection, preprocessing
 
-from homeserv_inter.constants import (
-    CATEGORICAL_FEATURES, CLEANED_DATA_DIR, DATA_DIR, DROPCOLS, LABEL_COLS,
-    LOW_IMPORTANCE_FEATURES, NLP_COLS, SEED, TIMESTAMP_COLS)
+from homeserv_inter.constants import (CATBOOST_FEATURES, CATEGORICAL_FEATURES,
+                                      CLEANED_DATA_DIR, DATA_DIR, DROPCOLS,
+                                      LABEL_COLS, LOW_IMPORTANCE_FEATURES,
+                                      NLP_COLS, SEED, TIMESTAMP_COLS)
 from homeserv_inter.sklearn_missval import LabelEncoderByColMissVal
 from wax_toolbox.profiling import Timer
 
@@ -207,6 +208,29 @@ class HomeServiceDataHandle:
         self.mode = mode
         self.drop_lowimp_features = drop_lowimp_features
 
+    @staticmethod
+    def _generate_catboost_df(df):
+        cols = df.columns.tolist()
+
+        if 'target' in cols:
+            cols.remove('target')
+
+        catboost_features = list(
+            set(cols).intersection(set(CATBOOST_FEATURES)))
+        other_cols = list(set(cols) - set(catboost_features))
+
+        # Reorder:
+        df = df.loc[:, catboost_features + other_cols].copy()
+
+        # Convert into integers without nans:
+        for col in catboost_features:
+            maxcol = df[col].max()
+            maxcol = maxcol if maxcol is not np.nan else 0  # case only nan
+            df.loc[:, col] = df.loc[:, col].fillna(maxcol)
+            df.loc[:, col] = df[col].astype(int)
+
+        return df, catboost_features
+
     # Methods to get cleaned datas:
     def _get_cleaned_single_set(self, dataset="train"):
         with Timer("Reading train set"):
@@ -225,7 +249,7 @@ class HomeServiceDataHandle:
 
         return df
 
-    def get_test_set(self):
+    def get_test_set(self, as_cgb_pool=False):
         df = self._get_cleaned_single_set(dataset="test")
 
         if self.drop_lowimp_features:
@@ -234,9 +258,16 @@ class HomeServiceDataHandle:
                 set(LOW_IMPORTANCE_FEATURES))
             df = df.drop(columns=list(dropcols))
 
+        if as_cgb_pool:
+            df, catboost_features = self._generate_catboost_df(df)
+            idx_cat_features = list(range(len(catboost_features)))
+            return cgb.Pool(data=df, label=None, cat_features=idx_cat_features)
+
         return df
 
-    def get_train_set(self, as_xgb_dmatrix=False, as_lgb_dataset=False,
+    def get_train_set(self,
+                      as_xgb_dmatrix=False,
+                      as_lgb_dataset=False,
                       as_cgb_pool=False):
         df = self._get_cleaned_single_set(dataset="train")
         train_cols = df.columns.tolist()
@@ -253,7 +284,9 @@ class HomeServiceDataHandle:
         elif as_lgb_dataset:
             return lgb.Dataset(df[train_cols], df[["target"]].values.ravel())
         elif as_cgb_pool:
-            return cgb.Pool(df[train_cols], df[["target"]])
+            df, catboost_features = self._generate_catboost_df(df)
+            idx_cat_features = list(range(len(catboost_features)))
+            return cgb.Pool(df[train_cols], df[["target"]], idx_cat_features)
         else:
             return df[train_cols], df[["target"]]
 
@@ -287,9 +320,14 @@ class HomeServiceDataHandle:
                 lgb.Dataset(Xtest, ytest.values.ravel()),
             )
         elif as_cgb_pool:
+            Xtrain, catboost_features = self._generate_catboost_df(Xtrain)
+            Xtest, catboost_features_bis = self._generate_catboost_df(Xtest)
+            assert catboost_features == catboost_features_bis
+
+            idx_cat_features = list(range(len(catboost_features)))
             return (
-                cgb.Pool(Xtrain, ytrain),
-                cgb.Pool(Xtest, ytest)
+                cgb.Pool(Xtrain, ytrain, idx_cat_features),
+                cgb.Pool(Xtest, ytest, idx_cat_features)
             )
         else:
             return Xtrain, Xtest, ytrain, ytest
