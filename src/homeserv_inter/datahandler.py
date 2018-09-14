@@ -266,23 +266,24 @@ def generate_cleaned_sets(drop_cols=DROPCOLS, include_hist=False):
     with Timer("Gen clean trainset", True):
         df_train = _generate_cleaned_single_set(
             dataset="train", drop_cols=drop_cols, include_hist=include_hist)
-        savepath = CLEANED_DATA_DIR / "{}_cleaned.parquet.gzip".format('train')
-        with Timer("Saving into {}".format(savepath)):
-            df_train.to_parquet(savepath, compression="gzip")
+
+    savepath = CLEANED_DATA_DIR / "{}_cleaned.parquet.gzip".format('train')
+    with Timer("Saving into {}".format(savepath)):
+        df_train.to_parquet(savepath, compression="gzip")
 
     with Timer("Gen clean testset", True):
         df_test = _generate_cleaned_single_set(
             dataset="test", drop_cols=drop_cols, include_hist=False)
 
-    if include_hist:
-        for cat in CAT_FEATURES_LIST:
-            name1 = 'DELTA_INTERV_' + '_'.join(cat)
-            name2 = 'COUNT_' + '_'.join(cat)
-            df_test = df_test.merge(df_train[[name1, name2]], on=cat)
-
     savepath = CLEANED_DATA_DIR / "{}_cleaned.parquet.gzip".format('test')
     with Timer("Saving into {}".format(savepath)):
-        df_train.to_parquet(savepath, compression="gzip")
+        df_test.to_parquet(savepath, compression="gzip")
+
+    # if include_hist:
+    #     for cat in CAT_FEATURES_LIST:
+    #         name1 = 'DELTA_INTERV_' + '_'.join(cat)
+    #         name2 = 'COUNT_' + '_'.join(cat)
+    #         df_test = df_test.merge(df_train[[name1, name2]], on=cat)
 
 
 class HomeServiceDataHandle:
@@ -309,7 +310,8 @@ class HomeServiceDataHandle:
 
         catboost_features = list(
             set(cols).intersection(set(CATBOOST_FEATURES)))
-        catboost_features = sorted(catboost_features)  # sort them for next run consistency
+        catboost_features = sorted(
+            catboost_features)  # sort them for next run consistency
 
         other_cols = list(set(cols) - set(catboost_features))
 
