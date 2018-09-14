@@ -371,7 +371,7 @@ class CatBoostHomService(BaseModelHomeService):
         assert num_boost_round is not None
 
         if not from_model_saved:
-            dtrain = self.get_train_set(as_cgb_dataset=True)
+            dtrain = self.get_train_set(as_cgb_pool=True)
 
             booster = cgb.train(
                 dtrain=dtrain,
@@ -383,7 +383,7 @@ class CatBoostHomService(BaseModelHomeService):
         else:
             booster = cgb.CatBoost(model_file=from_model_saved)
 
-        dftest = self.get_test_set(as_cgb_dataset=True)
+        dftest = self.get_test_set(as_cgb_pool=True)
 
         with Timer("Predicting"):
             pred = booster.predict(dftest)
