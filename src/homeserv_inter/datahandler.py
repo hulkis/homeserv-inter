@@ -7,15 +7,16 @@ import pandas as pd
 import xgboost as xgb
 from sklearn import model_selection, preprocessing
 
-from homeserv_inter.constants import (CATBOOST_FEATURES, CATEGORICAL_FEATURES,
-                                      CLEANED_DATA_DIR, DATA_DIR, DROPCOLS,
-                                      LABEL_COLS, LOW_IMPORTANCE_FEATURES,
-                                      NLP_COLS, SEED, TIMESTAMP_COLS)
+from homeserv_inter.constants import (
+    CATBOOST_FEATURES, CATEGORICAL_FEATURES, CLEANED_DATA_DIR, DATA_DIR,
+    DROPCOLS, LABEL_COLS, LOW_IMPORTANCE_FEATURES, NLP_COLS, RAW_DATA_DIR,
+    SEED, TIMESTAMP_COLS)
 from homeserv_inter.sklearn_missval import LabelEncoderByColMissVal
 from wax_toolbox.profiling import Timer
 
-
 # Feature ing.:
+
+
 def datetime_features_single(df, col):
     # It is needed to reconvert to datetime, as parquet fail and get sometimes
     # int64 which are epoch, but pandas totally handle it like a boss
@@ -38,6 +39,41 @@ def datetime_features_single(df, col):
         df[col] = pd.to_numeric(df[col], downcast="signed")
 
     return df
+
+
+DEFAULT_SUBSET_HIST = [
+    'SCHEDULED_START_DATE',
+    'SCHEDULED_END_DATE',
+    'ACTUAL_START_DATE',
+    'ACTUAL_END_DATE',
+    "INSTANCE_ID",
+    "RESOURCE_ID",
+]
+
+
+def read_intervention_history(subset=DEFAULT_SUBSET_HIST):
+    with Timer("Reading intervention_history.csv"):
+        df = pd.read_csv(
+            RAW_DATA_DIR / "intervention_history.csv",
+            sep="|",
+            encoding="Latin-1")
+        dt_cols = [
+            "DATE_SAISIE_RETOUR",
+            "SCHEDULED_START_DATE",
+            "SCHEDULED_END_DATE",
+            "ACTUAL_START_DATE",
+            "ACTUAL_END_DATE",
+            "CRE_DATE_GZL",
+        ]
+
+    for col in dt_cols:
+        df[col] = pd.to_datetime(df[col])
+
+    if subset is not None:
+        assert all([v in df.columns for v in subset])
+        return df[subset]
+    else:
+        return df
 
 
 def build_features_datetime(df):
@@ -154,6 +190,15 @@ CAT_FEATURES_LIST = [['INSTANCE_ID'], ['RESOURCE_ID'],
 def build_features(df, include_hist=False):
     """Build features."""
 
+    if include_hist:
+        with Timer("Add history features"):
+            dfhist = read_intervention_history()
+            for cl in CAT_FEATURES_LIST:
+                print('Engineering new categorical features for {}'.format(cl))
+                dfhist = build_features_cat(dfhist, cl)
+
+        df = df.merge(dfhist, how="left")
+
     with Timer("Building timestamp features"):
         df = build_features_datetime(df)
 
@@ -166,19 +211,13 @@ def build_features(df, include_hist=False):
         label_encoder = LabelEncoderByColMissVal(columns=label_cols)
         df = label_encoder.fit_transform(df)
 
-    if include_hist:
-        with Timer("Add history features"):
-            for cl in CAT_FEATURES_LIST:
-                print('Engineering new categorical features for {}'.format(cl))
-                df = build_features_cat(df, cl)
-
     to_drop = list(set(TIMESTAMP_COLS).intersection(set(df.columns)))
     df = df.drop(columns=to_drop)
 
     return df
 
 
-def build_features_cat(df, filter):
+def build_features_cat(df, filter, dfhist):
     def _mean_delta_interv(df):
         _df = df.dropna(
             subset=[

@@ -80,19 +80,19 @@ def convert_csv_to_parquet(engine="pyarrow"):
         dt_cols = ["SCHEDULED_START_DATE", "SCHEDULED_END_DATE", "CRE_DATE_GZL"]
         intervention_train_df = to_datetimes(dt_cols, intervention_train_df)
 
-    with Timer("Reading intervention_history.csv"):
-        intervention_history_df = pd.read_csv(
-            RAW_DATA_DIR / "intervention_history.csv", sep="|", encoding="Latin-1"
-        )
-        dt_cols = [
-            "DATE_SAISIE_RETOUR",
-            "SCHEDULED_START_DATE",
-            "SCHEDULED_END_DATE",
-            "ACTUAL_START_DATE",
-            "ACTUAL_END_DATE",
-            "CRE_DATE_GZL",
-        ]
-        intervention_history_df = to_datetimes(dt_cols, intervention_history_df)
+    # with Timer("Reading intervention_history.csv"):
+    #     intervention_history_df = pd.read_csv(
+    #         RAW_DATA_DIR / "intervention_history.csv", sep="|", encoding="Latin-1"
+    #     )
+    #     dt_cols = [
+    #         "DATE_SAISIE_RETOUR",
+    #         "SCHEDULED_START_DATE",
+    #         "SCHEDULED_END_DATE",
+    #         "ACTUAL_START_DATE",
+    #         "ACTUAL_END_DATE",
+    #         "CRE_DATE_GZL",
+    #     ]
+    #     intervention_history_df = to_datetimes(dt_cols, intervention_history_df)
 
     with Timer("Reading nature-code csv"):
         nature_code_eau_chaude = pd.read_csv(
