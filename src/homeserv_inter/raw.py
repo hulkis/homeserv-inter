@@ -1,5 +1,4 @@
 import pandas as pd
-
 from homeserv_inter.constants import DATA_DIR, NUMERIC_COLS, RAW_DATA_DIR, STR_COLS
 from wax_toolbox import Timer
 
@@ -10,146 +9,86 @@ def to_datetimes(dt_cols, df):
     return df
 
 
-def merge_them_all(intervention_test_df, orga_df, equipement_df,
-                   contrat_history_df, nature_code_eau_chaude,
-                   nature_code_energie, nature_code_fonction,
-                   nature_code_installation, nature_code_specification):
-    data = intervention_test_df.merge(equipement_df, how="left", on="INSTANCE_ID")
-    data = data.merge(
-        orga_df,
-        how="left",
-        left_on="ORGANISATION_ID",
-        right_on="L2_ORGANISATION_ID",
-    )
-    contrat_history_s = (
-        data[["INCIDENT_NUMBER", "INSTANCE_ID", "CRE_DATE_GZL"]]
-        .merge(contrat_history_df)
-        .query("CRE_DATE_GZL>=UPD_DATE")
-    )
-    contrat_history_s = contrat_history_s.sort_values(
-        ["INCIDENT_NUMBER", "UPD_DATE"], ascending=[True, False]
-    ).drop_duplicates(keep="first", subset=["INCIDENT_NUMBER"])
-    data = data.merge(contrat_history_s, how="left").merge(
-        nature_code_eau_chaude, how="left"
-    )
-    data = data.merge(nature_code_energie, how="left").merge(
-        nature_code_fonction, how="left"
-    )
-    data = data.merge(nature_code_installation, how="left").merge(
-        nature_code_specification, how="left"
-    )
-    return data
+class HomeServiceRaw:
+    def __init__(self, use_full_history=False, engine="pyarrow"):
+        self.use_full_history = use_full_history
+        self.engine = engine
 
+    def _merge_them_all_with_full_history(self, data, df_orga, df_equipement,
+                                          df_contract_history,
+                                          *df_nature_codes):
 
-def merge_them_all_with_history(df, orga_df, equipement_df,
-                                contrat_history_df, nature_code_eau_chaude,
-                                nature_code_energie, nature_code_fonction,
-                                nature_code_installation, nature_code_specification,):
-    data = df.merge(equipement_df, how="left", on="INSTANCE_ID")
-    data = data.merge(orga_df, how="left",
-                      left_on="ORGANISATION_ID",
-                      right_on="L2_ORGANISATION_ID")
-    contrat_history_s = (
-        data[["INCIDENT_NUMBER", "INSTANCE_ID", "CRE_DATE_GZL"]]
-        .merge(contrat_history_df)
-        .query("CRE_DATE_GZL>=UPD_DATE")
-    )
-    contrat_history_s = contrat_history_s.sort_values(
-        ["INCIDENT_NUMBER", "UPD_DATE"], ascending=[True, False]
-    ).drop_duplicates(keep="first", subset=["INCIDENT_NUMBER"])
-    data = data.merge(contrat_history_s, how="left").merge(
-        nature_code_eau_chaude, how="left"
-    )
-    data = data.merge(nature_code_energie, how="left").merge(
-        nature_code_fonction, how="left"
-    )
-    data = data.merge(nature_code_installation, how="left").merge(
-        nature_code_specification, how="left"
-    )
-    return data
+        data = data.merge(df_contract_history, how="left", on="INSTANCE_ID")
 
+        subset = ['CONTRACT_NUMBER', 'INSTANCE_ID', 'CRE_DATE_GZL']
+        data = data.dropna(subset=subset)
+        data = data.drop_duplicates(keep='first', subset=subset)
 
-def convert_csv_to_parquet(with_history=False, engine="pyarrow"):
-    """Convert csv files into train.parquet.gzip & test.parquet.gzip.
-    Args:
-        engine (str): engine for parquet format among ['pyarrow', 'fastparquet']
+        # Ordering before processing
+        data = data.sort_values(['CONTRACT_NUMBER','CRE_DATE_GZL'])
+        data = data.reset_index(drop=True)
 
-    Assumption:
+        # Some initializations
+        gp = data.groupby(['CONTRACT_NUMBER'])
+        target = pd.DataFrame()
+        sixmonth = pd.Timedelta(days=30*6)
 
-        ..code :: bash
-            ❯ tree data
-            data
-            ├── raw
-            │   ├── contract_history.csv
-            │   ├── data_description.xlsx
-            │   ├── equipment.csv
-            │   ├── intervention_history.csv
-            │   ├── intervention-life-cycle
-            │   │   ├── PROCESS_BI_CONTRATS_EN.ppt
-            │   │   └── PROCESS_BI_CONTRATS_FR.ppt
-            │   ├── intervention_test.csv
-            │   ├── intervention_train.csv
-            │   ├── nature-code
-            │   │   ├── nature_code_eau_chaude.csv
-            │   │   ├── nature_code_energie.csv
-            │   │   ├── nature_code_fonction.csv
-            │   │   ├── nature_code_installation.csv
-            │   │   └── nature_code_specification.csv
-            │   ├── organisation.csv
-            │   └── sample_submission.csv
-            └── read_and_join.ipynb
+        with Timer('Reconstructing targets', at_enter=True):
+            data['target_td'] = data.groupby('CONTRACT_NUMBER')['CRE_DATE_GZL'].diff(-1) * (-1)
 
-            3 directories, 16 files
-"""
+        data = data.dropna(subset=['target_td'])
+        data['target'] = (data['target_td'] <= sixmonth).astype(int)
 
-    with Timer("Reading organisation.csv"):
-        orga_df = pd.read_csv(
-            RAW_DATA_DIR / "organisation.csv", sep="|", encoding="Latin-1"
+        # Convert to number of days:
+        data['target_td'] = data['target_td'].dt.days
+
+        data = data.merge(df_equipement, how="left", on="INSTANCE_ID")
+        data = data.merge(
+            df_orga, how="left",
+            left_on="ORGANISATION_ID",
+            right_on="L2_ORGANISATION_ID",
         )
 
-    with Timer("Reading equipment.csv"):
-        equipement_df = pd.read_csv(
-            RAW_DATA_DIR / "equipment.csv", sep="|", encoding="Latin-1"
-        )
-        dt_cols = ["INSTALL_DATE", "RACHAT_DATE"]
-        equipement_df = to_datetimes(dt_cols, equipement_df)
+        # Merging with all nature codes:
+        for df in df_nature_codes:
+            data = data.merge(df, how="left")
 
-    with Timer("Reading contract_history.csv"):
-        contrat_history_df = pd.read_csv(
-            RAW_DATA_DIR / "contract_history.csv", sep="|", encoding="Latin-1"
-        )
-        dt_cols = ["CRE_DATE", "UPD_DATE", "DATE_RESILIATION", "DATE_DEBUT", "DATE_FIN"]
-        contrat_history_df = to_datetimes(dt_cols, contrat_history_df)
+        return data
 
-    with Timer("Reading intervention_test.csv"):
-        intervention_test_df = pd.read_csv(
-            RAW_DATA_DIR / "intervention_test.csv", sep="|", encoding="Latin-1"
-        )
-        dt_cols = ["SCHEDULED_START_DATE", "SCHEDULED_END_DATE", "CRE_DATE_GZL"]
-        intervention_test_df = to_datetimes(dt_cols, intervention_test_df)
+    def _merge_them_all(self, data, df_orga, df_equipement,
+                        df_contract_history, *df_nature_codes):
 
-    with Timer("Reading intervention_train.csv"):
-        intervention_train_df = pd.read_csv(
-            RAW_DATA_DIR / "intervention_train.csv", sep="|", encoding="Latin-1"
-        )
-        dt_cols = ["SCHEDULED_START_DATE", "SCHEDULED_END_DATE", "CRE_DATE_GZL"]
-        intervention_train_df = to_datetimes(dt_cols, intervention_train_df)
+        if self.use_full_history:
+            return self._merge_them_all_with_full_history(
+                data, df_orga, df_equipement, df_contract_history,
+                *df_nature_codes)
 
-    with Timer("Reading intervention_history.csv"):
-        intervention_history_df = pd.read_csv(
-            RAW_DATA_DIR / "intervention_history.csv", sep="|", encoding="Latin-1"
+        data = data.merge(df_equipement, how="left", on="INSTANCE_ID")
+        data = data.merge(
+            df_orga,
+            how="left",
+            left_on="ORGANISATION_ID",
+            right_on="L2_ORGANISATION_ID",
         )
-        dt_cols = [
-            "DATE_SAISIE_RETOUR",
-            "SCHEDULED_START_DATE",
-            "SCHEDULED_END_DATE",
-            "ACTUAL_START_DATE",
-            "ACTUAL_END_DATE",
-            "CRE_DATE_GZL",
-        ]
-        intervention_history_df = to_datetimes(dt_cols, intervention_history_df)
 
-    with Timer("Reading nature-code csv"):
+        # Dropping some values:
+        contrat_history_s = (data[[
+            "INCIDENT_NUMBER", "INSTANCE_ID", "CRE_DATE_GZL"
+        ]].merge(df_contract_history).query("CRE_DATE_GZL>=UPD_DATE"))
+        contrat_history_s = contrat_history_s.sort_values(
+            ["INCIDENT_NUMBER", "UPD_DATE"],
+            ascending=[True, False]).drop_duplicates(
+                keep="first", subset=["INCIDENT_NUMBER"])
+
+        data = data.merge(contrat_history_s, how="left")
+
+        # Merging with all nature codes:
+        for df in df_nature_codes:
+            data = data.merge(df, how="left")
+
+        return data
+
+    def read_nature_codes(self):
         nature_code_eau_chaude = pd.read_csv(
             RAW_DATA_DIR / "nature-code/nature_code_eau_chaude.csv",
             sep="|",
@@ -176,35 +115,140 @@ def convert_csv_to_parquet(with_history=False, engine="pyarrow"):
             encoding="Latin-1",
         )
 
-    alldfs = (orga_df, equipement_df,
-              contrat_history_df, nature_code_eau_chaude,
-              nature_code_energie, nature_code_fonction,
-              nature_code_installation, nature_code_specification)
+        return (nature_code_eau_chaude, nature_code_energie,
+                nature_code_fonction, nature_code_installation,
+                nature_code_specification)
 
-    with Timer("Merging all train set"):
-        if with_history:
-            train_data = merge_them_all_with_history(
-                intervention_history_df, *alldfs)
+    def read_organisation(self):
+        return pd.read_csv(
+            RAW_DATA_DIR / "organisation.csv", sep="|", encoding="Latin-1")
+
+    def read_equipement(self):
+        equipement_df = pd.read_csv(
+            RAW_DATA_DIR / "equipment.csv", sep="|", encoding="Latin-1")
+        dt_cols = ["INSTALL_DATE", "RACHAT_DATE"]
+        return to_datetimes(dt_cols, equipement_df)
+
+    def read_contract_history(self):
+        contrat_history_df = pd.read_csv(
+            RAW_DATA_DIR / "contract_history.csv", sep="|", encoding="Latin-1")
+        dt_cols = [
+            "CRE_DATE", "UPD_DATE", "DATE_RESILIATION", "DATE_DEBUT",
+            "DATE_FIN"
+        ]
+        return to_datetimes(dt_cols, contrat_history_df)
+
+    def read_intervention_test(self):
+        intervention_test_df = pd.read_csv(
+            RAW_DATA_DIR / "intervention_test.csv",
+            sep="|",
+            encoding="Latin-1")
+        dt_cols = [
+            "SCHEDULED_START_DATE", "SCHEDULED_END_DATE", "CRE_DATE_GZL"
+        ]
+        return to_datetimes(dt_cols, intervention_test_df)
+
+    def read_intervention_train(self):
+        intervention_train_df = pd.read_csv(
+            RAW_DATA_DIR / "intervention_train.csv",
+            sep="|",
+            encoding="Latin-1")
+        dt_cols = [
+            "SCHEDULED_START_DATE", "SCHEDULED_END_DATE", "CRE_DATE_GZL"
+        ]
+        return to_datetimes(dt_cols, intervention_train_df)
+
+    def read_intervention_history(self):
+        intervention_history_df = pd.read_csv(
+            RAW_DATA_DIR / "intervention_history.csv",
+            sep="|",
+            encoding="Latin-1")
+        dt_cols = [
+            "DATE_SAISIE_RETOUR",
+            "SCHEDULED_START_DATE",
+            "SCHEDULED_END_DATE",
+            "ACTUAL_START_DATE",
+            "ACTUAL_END_DATE",
+            "CRE_DATE_GZL",
+        ]
+        return to_datetimes(dt_cols, intervention_history_df)
+
+    def read_all(self):
+        with Timer("Reading organisation.csv"):
+            df_orga = self.read_organisation()
+
+        with Timer("Reading equipment.csv"):
+            df_equipement = self.read_equipement()
+
+        with Timer("Reading contract_history.csv"):
+            df_contract_history = self.read_contract_history()
+
+        with Timer("Reading intervention_test.csv"):
+            df_intervention_test = self.read_intervention_test()
+
+        if not self.use_full_history:
+            with Timer("Reading intervention_train.csv"):
+                df_interv = self.read_intervention_train()
         else:
-            train_data = merge_them_all(intervention_train_df, *alldfs)
-        for col in STR_COLS:
-            train_data[col] = train_data[col].astype(str)
-        for col in NUMERIC_COLS + ["target"]:
-            train_data[col] = pd.to_numeric(train_data[col], downcast='signed')
+            with Timer("Reading intervention_history.csv"):
+                df_interv = self.read_intervention_history()
 
-        if with_history:
-            pathfile = DATA_DIR / "history_train.parquet.gzip"
+        df_nature_codes = self.read_nature_codes()
+        return (df_orga, df_equipement, df_contract_history,
+                df_intervention_test, df_interv, df_nature_codes)
+
+    def convert(self):
+
+        with Timer('-----Reading all csv-----', at_enter=True):
+            (df_orga, df_equipement, df_contract_history, df_intervention_test,
+             df_interv, df_nature_codes) = self.read_all()
+
+        with Timer("-----Merging all train set-----", at_enter=True):
+            train_data = self._merge_them_all(
+                df_interv, df_orga, df_equipement, df_contract_history,
+                *df_nature_codes)
+
+            # Str cols
+            str_cols = set(STR_COLS).intersection(set(train_data.columns.tolist()))
+            for col in str_cols:
+                train_data[col] = train_data[col].astype(str)
+
+            # Numeric cols
+            numeric_cols = set(NUMERIC_COLS).intersection(set(train_data.columns.tolist()))
+            for col in numeric_cols:
+                train_data[col] = pd.to_numeric(
+                    train_data[col], downcast='signed', errors='coerce')
+
+            if 'target' in train_data:
+                train_data[col] = pd.to_numeric(
+                    train_data[col], downcast='signed', errors='coerce')
+
+        if self.use_full_history:
+            pathfile = DATA_DIR / "fullhist_train.parquet.gzip"
         else:
             pathfile = DATA_DIR / "train.parquet.gzip"
 
-        train_data.to_parquet(pathfile, compression="gzip", engine=engine)
+        with Timer('Saving into {}'.format(pathfile)):
+            train_data.to_parquet(
+                pathfile, compression="gzip", engine=self.engine)
 
-    with Timer("Merging all test set"):
-        test_data = merge_them_all(intervention_test_df, *alldfs)
-        for col in STR_COLS:
-            test_data[col] = test_data[col].astype(str)
-        for col in NUMERIC_COLS:
-            test_data[col] = pd.to_numeric(test_data[col], downcast='signed')
-        test_data.to_parquet(
-            DATA_DIR / "test.parquet.gzip", compression="gzip", engine=engine
-        )
+        with Timer("-----Merging all test set-----", at_enter=True):
+            test_data = self._merge_them_all(
+                df_intervention_test, df_orga, df_equipement,
+                df_contract_history, *df_nature_codes)
+
+            # Str cols
+            str_cols = set(STR_COLS).intersection(set(test_data.columns.tolist()))
+            for col in str_cols:
+                test_data[col] = test_data[col].astype(str)
+
+            # Numeric cols
+            numeric_cols = set(NUMERIC_COLS).intersection(set(test_data.columns.tolist()))
+            for col in numeric_cols:
+                test_data[col] = pd.to_numeric(
+                    test_data[col], downcast='signed', errors='coerce')
+
+        pathfile = DATA_DIR / "test.parquet.gzip"
+        with Timer('Saving into {}'.format(pathfile)):
+            test_data.to_parquet(
+                pathfile, compression="gzip", engine=self.engine)

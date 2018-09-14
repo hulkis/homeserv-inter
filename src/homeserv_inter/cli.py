@@ -4,13 +4,13 @@ import fire
 from homeserv_inter.datahandler import generate_cleaned_sets
 from homeserv_inter.geo import GeocoderHomeserv
 from homeserv_inter.model import CatBoostHomService, LgbHomeService, XgbHomeService
-from homeserv_inter.raw import convert_csv_to_parquet
+from homeserv_inter.raw import HomeServiceRaw
 
 
 def main():
     return fire.Fire(
         {
-            "convert-raw": convert_csv_to_parquet,
+            "raw": HomeServiceRaw,
             "convert-cleaned": generate_cleaned_sets,
             "geo": GeocoderHomeserv,
             "lgb": LgbHomeService,
