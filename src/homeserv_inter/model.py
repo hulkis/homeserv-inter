@@ -1,10 +1,10 @@
 import warnings
 
+import catboost as cgb
 import hyperopt
 import lightgbm as lgb
 import pandas as pd
 import xgboost as xgb
-import catboost as cgb
 
 from homeserv_inter.constants import LABEL_COLS, MODEL_DIR, RESULT_DIR, TUNING_DIR
 from homeserv_inter.datahandler import HomeServiceDataHandle
@@ -50,7 +50,7 @@ class BaseModelHomeService(HomeServiceDataHandle, HyperParamsTuning):
         raise NotImplementedError
 
     def save_model(self, booster):
-        now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-%mm")
+        now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-Mm")
         f = MODEL_DIR / "{}_model_{}.txt".format(self.algo, now)
         booster.save_model(f.as_posix())
 
@@ -61,7 +61,7 @@ class BaseModelHomeService(HomeServiceDataHandle, HyperParamsTuning):
             dfhist = pd.DataFrame(eval_hist)
             fig = dfhist.iplot.scatter(as_figure=True)
             import plotly
-            now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-%mm")
+            now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-Mm")
             filepath = RESULT_DIR / 'lgb_eval_hist_{}.html'.format(now)
             plotly.offline.plot(fig, filename=filepath.as_posix())
         except ImportError:
@@ -178,9 +178,13 @@ class LgbHomeService(BaseModelHomeService):
 
         return booster
 
-    def cv(self, params_model=None, nfolds=5,
-            num_boost_round=10000, early_stopping_rounds=100,
-            generate_plot=False, **kwargs):
+    def cv(self,
+           params_model=None,
+           nfolds=5,
+           num_boost_round=10000,
+           early_stopping_rounds=100,
+           generate_plot=False,
+           **kwargs):
 
         dtrain = self.get_train_set(as_lgb_dataset=True)
 
@@ -227,7 +231,7 @@ class LgbHomeService(BaseModelHomeService):
             pred = booster.predict(df)
 
         df = pd.DataFrame({"target": pred})
-        now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-%mm")
+        now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-Mm")
         df.to_csv(RESULT_DIR / "submit_{}.csv".format(now), index=False)
 
 
@@ -275,9 +279,13 @@ class XgbHomeService(BaseModelHomeService):
             self.save_model(booster)
         return booster
 
-    def cv(self, params_model=None, nfold=5,
-           num_boost_round=10000, early_stopping_rounds=100,
-           generate_plot=False, **kwargs):
+    def cv(self,
+           params_model=None,
+           nfold=5,
+           num_boost_round=10000,
+           early_stopping_rounds=100,
+           generate_plot=False,
+           **kwargs):
 
         # If no params_model is given, take self.params_best_fit
         if params_model is None:
@@ -335,15 +343,19 @@ class CatBoostHomService(BaseModelHomeService):
             self.save_model(booster)
         return booster
 
-    def cv(self, params_model=None, nfold=5,
-           num_boost_round=10000, early_stopping_rounds=100,
-           generate_plot=False, **kwargs):
+    def cv(self,
+           params_model=None,
+           nfold=5,
+           num_boost_round=10000,
+           early_stopping_rounds=100,
+           **kwargs):
 
         # If no params_model is given, take self.params_best_fit
         if params_model is None:
             params_model = self.params_best_fit
 
         dtrain = self.get_train_set(as_cgb_pool=True)
+
         eval_hist = cgb.cv(
             params=params_model,
             dtrain=dtrain,
@@ -353,7 +365,33 @@ class CatBoostHomService(BaseModelHomeService):
             early_stopping_rounds=early_stopping_rounds,
             **kwargs)
 
-        if generate_plot:
-            self._generate_plot(eval_hist)
-
         return eval_hist
+
+    def generate_submit(self, num_boost_round=None, from_model_saved=False):
+        assert num_boost_round is not None
+
+        if not from_model_saved:
+            dtrain = self.get_train_set(as_cgb_dataset=True)
+
+            booster = cgb.train(
+                dtrain=dtrain,
+                params=self.params_best_fit,
+                num_boost_round=num_boost_round)
+
+            self.save_model(booster)
+
+        else:
+            booster = cgb.CatBoost(model_file=from_model_saved)
+
+        dftest = self.get_test_set(as_cgb_dataset=True)
+
+        with Timer("Predicting"):
+            pred = booster.predict(dftest)
+
+        dfpred = pd.DataFrame({"target": pred})
+        now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-Mm")
+
+        fpath = RESULT_DIR / "submit_{}.csv".format(now)
+
+        with Timer('Storing in {}'.format(fpath)):
+            dfpred.to_csv(fpath, index=False)
