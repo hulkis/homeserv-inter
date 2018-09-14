@@ -147,7 +147,7 @@ def build_features_str(df):
     return df
 
 
-def build_features(df):
+def build_features(df, include_hist=False):
     """Build features."""
 
     with Timer("Building timestamp features"):
@@ -165,13 +165,47 @@ def build_features(df):
         label_encoder = LabelEncoderByColMissVal(columns=label_cols)
         df = label_encoder.fit_transform(df)
 
+    if include_hist:
+        with Timer("Add history features"):
+            for cl in [['INSTANCE_ID'], ['RESOURCE_ID'], ['INSTANCE_ID', 'RESOURCE_ID']]:
+                print('Engineering new categorical features for {}'.format(cl))
+                df = build_features_cat(df, cl)
+
+    df = df.drop(columns=TIMESTAMP_COLS)
+
+    return df
+
+
+def build_features_cat(df, filter):
+
+    def _mean_delta_interv(df):
+        _df = df.dropna(subset=['SCHEDULED_START_DATE', 'SCHEDULED_END_DATE',
+                                'ACTUAL_START_DATE', 'ACTUAL_END_DATE'],
+                        how='all')
+
+        d_min = pd.concat([_df['ACTUAL_START_DATE'], _df['SCHEDULED_START_DATE']]).min()
+        d_max = pd.concat([_df['ACTUAL_END_DATE'], _df['SCHEDULED_END_DATE']]).max()
+
+        n = len(_df)
+        if n > 1:
+            delta = int(((d_max - d_min) / n).days / 30)
+        else:
+            delta = 0
+        return delta
+
+    new_feature1 = df.groupby(filter).apply(_mean_delta_interv).reset_index()\
+        .rename({0: 'DELTA_INTERV_' + '_'.join(filter)})
+    new_feature2 = df.groupby(filter).apply('count').reset_index() \
+        .rename({0: 'COUNT_' + '_'.join(filter)})
+    df = df.merge(new_feature1, on=filter).merge(new_feature2, on=filter)
+
     return df
 
 
 # Methods to generate cleaned datas:
 def _generate_cleaned_single_set(dataset,
                                  drop_cols=None,
-                                 use_full_history=False):
+                                 use_full_history=False, include_hist=False):
     """Generate one cleaned set amon ['train', 'test']"""
     if dataset == "train" and use_full_history:
         pathfile = DATA_DIR / "fullhist_{}.parquet.gzip".format(dataset)
@@ -188,25 +222,25 @@ def _generate_cleaned_single_set(dataset,
         drop_cols = list(set(drop_cols).intersection(set(df.columns.tolist())))
         df = df.drop(columns=drop_cols)
 
-    df = build_features(df)
+    df = build_features(df, include_hist=False)
 
     with Timer("Saving into {}".format(savepath)):
         df.to_parquet(savepath, compression="gzip")
 
 
-def generate_cleaned_sets(drop_cols=DROPCOLS, use_full_history=False):
+def generate_cleaned_sets(drop_cols=DROPCOLS, use_full_history=False, include_hist=False):
     """Generate cleaned sets."""
     with Timer("Gen clean trainset", True):
         _generate_cleaned_single_set(
             dataset="train",
             drop_cols=drop_cols,
-            use_full_history=use_full_history)
+            use_full_history=use_full_history, include_hist=include_hist)
 
     with Timer("Gen clean testset", True):
         _generate_cleaned_single_set(
             dataset="test",
             drop_cols=drop_cols,
-            use_full_history=use_full_history)
+            use_full_history=use_full_history, include_hist=include_hist)
 
 
 class HomeServiceDataHandle:
