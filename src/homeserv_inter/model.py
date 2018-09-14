@@ -6,7 +6,7 @@ import pandas as pd
 import xgboost as xgb
 import catboost as cgb
 
-from homeserv_inter.constants import LABEL_COLS, MODEL_DIR, RESULT_DIR, TUNING_DIR
+from homeserv_inter.constants import LABEL_COLS, MODEL_DIR, RESULT_DIR, TUNING_DIR, STR_COLS
 from homeserv_inter.datahandler import HomeServiceDataHandle
 from homeserv_inter.tuning import HyperParamsTuning
 from wax_toolbox import Timer
@@ -141,8 +141,8 @@ class LgbHomeService(BaseModelHomeService):
         # 'min_child_weight': 5,  # Minimum sum of instance weight(hessian) needed in a child(leaf)
         # 'subsample_for_bin': 200000,  # Number of samples for constructing bin
         # 'min_split_gain': 0,  # lambda_l1, lambda_l2 and min_gain_to_split to regularization
-        # 'reg_alpha': 0,  # L1 regularization term on weights
-        'reg_lambda': 0.01,  # L2 regularization term on weights
+        # 'reg_alpha': 0.01,  # L1 regularization term on weights
+        # 'reg_lambda': 0.02,  # L2 regularization term on weights
         **common_params,
     }
 
@@ -304,7 +304,7 @@ class CatBoostHomService(BaseModelHomeService):
     algo = 'catboost'
 
     common_params = {
-        "thread_count": 16,
+        "thread_count": 15,
         "objective": "Logloss",
         "eval_metric": "AUC",
         "scale_pos_weight": 0.33,  # used only in binary application, weight of labels with positive class
@@ -312,7 +312,7 @@ class CatBoostHomService(BaseModelHomeService):
 
     params_best_fit = {
         "max_depth": 12,
-        "learning_rate": 0.04,
+        "learning_rate": 0.03,
         **common_params,
     }
 
@@ -322,6 +322,7 @@ class CatBoostHomService(BaseModelHomeService):
 
     def validate(self, save_model=True, **kwargs):
         dtrain, dtest = self.get_train_valid_set(as_cgb_pool=True)
+
         watchlist = [dtrain, dtest]
 
         booster = cgb.train(
