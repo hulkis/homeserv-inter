@@ -259,9 +259,11 @@ class HomeServiceDataHandle:
             df = df.drop(columns=list(dropcols))
 
         if as_cgb_pool:
-            df, catboost_features = self._generate_catboost_df(df)
-            idx_cat_features = list(range(len(catboost_features)))
-            return cgb.Pool(data=df, label=None, cat_features=idx_cat_features)
+            with Timer('Creating Pool for Test set CatBoost'):
+                df, catboost_features = self._generate_catboost_df(df)
+                idx_cat_features = list(range(len(catboost_features)))
+                pool = cgb.Pool(data=df, label=None, cat_features=idx_cat_features)
+            return pool
 
         return df
 
@@ -284,9 +286,11 @@ class HomeServiceDataHandle:
         elif as_lgb_dataset:
             return lgb.Dataset(df[train_cols], df[["target"]].values.ravel())
         elif as_cgb_pool:
-            df, catboost_features = self._generate_catboost_df(df)
-            idx_cat_features = list(range(len(catboost_features)))
-            return cgb.Pool(df[train_cols], df[["target"]], idx_cat_features)
+            with Timer('Creating Pool for Train set CatBoost'):
+                df, catboost_features = self._generate_catboost_df(df)
+                idx_cat_features = list(range(len(catboost_features)))
+                pool = cgb.Pool(df[train_cols], df[["target"]], idx_cat_features)
+            return pool
         else:
             return df[train_cols], df[["target"]]
 
@@ -320,14 +324,13 @@ class HomeServiceDataHandle:
                 lgb.Dataset(Xtest, ytest.values.ravel()),
             )
         elif as_cgb_pool:
-            Xtrain, catboost_features = self._generate_catboost_df(Xtrain)
-            Xtest, catboost_features_bis = self._generate_catboost_df(Xtest)
-            assert catboost_features == catboost_features_bis
-
-            idx_cat_features = list(range(len(catboost_features)))
-            return (
-                cgb.Pool(Xtrain, ytrain, idx_cat_features),
-                cgb.Pool(Xtest, ytest, idx_cat_features)
-            )
+            with Timer('Creating Pool for Train&Test set CatBoost'):
+                Xtrain, catboost_features = self._generate_catboost_df(Xtrain)
+                Xtest, catboost_features_bis = self._generate_catboost_df(Xtest)
+                assert catboost_features == catboost_features_bis
+                idx_cat_features = list(range(len(catboost_features)))
+                pool_train = cgb.Pool(Xtrain, ytrain, idx_cat_features)
+                pool_test = cgb.Pool(Xtest, ytest, idx_cat_features)
+            return (pool_train, pool_test)
         else:
             return Xtrain, Xtest, ytrain, ytest
