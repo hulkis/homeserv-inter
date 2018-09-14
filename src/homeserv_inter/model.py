@@ -312,15 +312,15 @@ class CatBoostHomService(BaseModelHomeService):
     algo = 'catboost'
 
     common_params = {
-        "thread_count": 16,
+        "thread_count": 15,
         "objective": "Logloss",
         "eval_metric": "AUC",
         "scale_pos_weight": 0.33,  # used only in binary application, weight of labels with positive class
     }
 
     params_best_fit = {
-        "max_depth": 12,
-        "learning_rate": 0.04,
+        # "max_depth": 12,
+        "learning_rate": 0.02,
         **common_params,
     }
 
