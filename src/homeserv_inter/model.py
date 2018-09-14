@@ -50,7 +50,7 @@ class BaseModelHomeService(HomeServiceDataHandle, HyperParamsTuning):
         raise NotImplementedError
 
     def save_model(self, booster):
-        now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-Mm")
+        now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-%Mm")
         f = MODEL_DIR / "{}_model_{}.txt".format(self.algo, now)
         booster.save_model(f.as_posix())
 
@@ -61,7 +61,7 @@ class BaseModelHomeService(HomeServiceDataHandle, HyperParamsTuning):
             dfhist = pd.DataFrame(eval_hist)
             fig = dfhist.iplot.scatter(as_figure=True)
             import plotly
-            now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-Mm")
+            now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-%Mm")
             filepath = RESULT_DIR / 'lgb_eval_hist_{}.html'.format(now)
             plotly.offline.plot(fig, filename=filepath.as_posix())
         except ImportError:
@@ -231,7 +231,7 @@ class LgbHomeService(BaseModelHomeService):
             pred = booster.predict(df)
 
         df = pd.DataFrame({"target": pred})
-        now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-Mm")
+        now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-%Mm")
         df.to_csv(RESULT_DIR / "submit_{}.csv".format(now), index=False)
 
 
@@ -390,7 +390,7 @@ class CatBoostHomService(BaseModelHomeService):
             dfpred = pd.DataFrame(probas)[[1]]  # Get proba classe one
             dfpred = dfpred.rename(columns={1: 'target'})
 
-        now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-Mm")
+        now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-%Mm")
 
         fpath = RESULT_DIR / "catboost_submit_{}.csv".format(now)
 
