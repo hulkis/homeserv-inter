@@ -391,7 +391,7 @@ class CatBoostHomService(BaseModelHomeService):
         dfpred = pd.DataFrame({"target": pred})
         now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-Mm")
 
-        fpath = RESULT_DIR / "submit_{}.csv".format(now)
+        fpath = RESULT_DIR / "catboost_submit_{}.csv".format(now)
 
         with Timer('Storing in {}'.format(fpath)):
             dfpred.to_csv(fpath, index=False)
