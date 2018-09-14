@@ -312,7 +312,7 @@ class CatBoostHomService(BaseModelHomeService):
 
     params_best_fit = {
         "max_depth": 12,
-        "learning_rate": 0.03,
+        "learning_rate": 0.01,
         **common_params,
     }
 
@@ -345,6 +345,7 @@ class CatBoostHomService(BaseModelHomeService):
             params_model = self.params_best_fit
 
         dtrain = self.get_train_set(as_cgb_pool=True)
+
         eval_hist = cgb.cv(
             params=params_model,
             dtrain=dtrain,
@@ -358,3 +359,31 @@ class CatBoostHomService(BaseModelHomeService):
             self._generate_plot(eval_hist)
 
         return eval_hist
+
+    def generate_submit(self, num_boost_round=None, from_model_saved=False):
+
+        if not from_model_saved:
+            assert num_boost_round is not None
+
+            dtrain = self.get_train_set(as_cgb_pool=True)
+
+            booster = cgb.train(
+                dtrain=dtrain,
+                params=self.params_best_fit,
+                num_boost_round=num_boost_round)
+
+            self.save_model(booster)
+
+        else:
+            booster = lgb.Booster(model_file=from_model_saved)
+
+        __import__('IPython').embed()  # Enter Ipython
+        df = self.get_test_set()
+        with Timer("Predicting"):
+            pred = booster.predict(df)
+
+        df = pd.DataFrame({"target": pred})
+        now = pd.Timestamp.now(tz='CET').strftime("%d-%Hh-%mm")
+        df.to_csv(RESULT_DIR / "catboost_submit_{}.csv".format(now), index=False)
+
+# 125:    test: 0.9075119 best: 0.9095779 (120)   test1: 0.8400080        total: 23m 6s   remaining: 1d 6h 11m 1s
