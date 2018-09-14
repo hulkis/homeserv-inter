@@ -309,6 +309,8 @@ class HomeServiceDataHandle:
 
         catboost_features = list(
             set(cols).intersection(set(CATBOOST_FEATURES)))
+        catboost_features = sorted(catboost_features)  # sort them for next run consistency
+
         other_cols = list(set(df.columns.tolist()) - set(catboost_features))
 
         # Reorder:
