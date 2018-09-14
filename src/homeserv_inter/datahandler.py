@@ -370,9 +370,9 @@ class HomeServiceDataHandle:
 
         if self.drop_lowimp_features:
             print('Dropping low importance features !')
-            train_cols = [
-                col for col in train_cols if col not in LOW_IMPORTANCE_FEATURES
-            ]
+            dropcols = set(df.columns.tolist()).intersection(
+                set(LOW_IMPORTANCE_FEATURES))
+            df = df.drop(columns=list(dropcols))
 
         if as_xgb_dmatrix:
             return xgb.DMatrix(data=df[train_cols], label=df[["target"]])
