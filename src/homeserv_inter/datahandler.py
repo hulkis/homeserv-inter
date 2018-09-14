@@ -311,7 +311,11 @@ class HomeServiceDataHandle:
             set(cols).intersection(set(CATBOOST_FEATURES)))
         catboost_features = sorted(catboost_features)  # sort them for next run consistency
 
-        other_cols = list(set(df.columns.tolist()) - set(catboost_features))
+        other_cols = list(set(cols) - set(catboost_features))
+
+        # Add back target if needed
+        if 'target' in df.columns:
+            other_cols = other_cols + ['target']
 
         # Reorder:
         df = df.loc[:, catboost_features + other_cols].copy()
