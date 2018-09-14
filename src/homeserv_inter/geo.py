@@ -102,7 +102,7 @@ class GeocoderHomeserv:
                 DATA_DIR / "{}.parquet.gzip".format(self.dataset))
 
             if self.debug:
-                df = df.sample(100, random_state=1234)
+                df = df.head(10)
 
         g = self.geolocator
 
@@ -143,7 +143,7 @@ class GeocoderHomeserv:
                 DATA_DIR / "{}.parquet.gzip".format(self.dataset))
 
             if self.debug:
-                df = df.sample(100, random_state=1234)
+                df = df.head(10)
 
         # Clients
         fcache_name = '{}_{}set_geocodes_{}.pkl'.format(
@@ -161,9 +161,8 @@ class GeocoderHomeserv:
 
         def _foo(row):
             try:
-                dist = distance.distance(
-                    distance.lonlat(*row['LONG_LAT_CLIENT']), distance.lonlat(*row['LONG_LAT_L2'])
-                )
+                dist = int(distance.distance(row['LONG_LAT_CLIENT'].point,
+                                             row['LONG_LAT_L2'].point).km)
             except:
                 dist = np.nan
 
