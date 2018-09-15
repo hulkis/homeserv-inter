@@ -1,7 +1,7 @@
 import re
-import category_encoders as ce
 
 import catboost as cgb
+import category_encoders as ce
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
@@ -9,10 +9,9 @@ import xgboost as xgb
 from sklearn import model_selection, preprocessing
 
 from homeserv_inter.constants import (
-    CATBOOST_FEATURES, CATEGORICAL_FEATURES, CLEANED_DATA_DIR, DATA_DIR,
-    DROPCOLS, LABEL_COLS, LOW_IMPORTANCE_FEATURES, NLP_COLS, RAW_DATA_DIR,
-    SEED, TIMESTAMP_COLS)
-from homeserv_inter.sklearn_missval import LabelEncoderByColMissVal
+    CATBOOST_FEATURES, CLEANED_DATA_DIR, DATA_DIR, DROPCOLS, HIGH_NUM_CAT,
+    LABEL_COLS, LOW_IMPORTANCE_FEATURES, MEDIUM_NUM_CAT, NLP_COLS,
+    RAW_DATA_DIR, SEED, SMALL_E_ONEHOT, TIMESTAMP_COLS)
 from wax_toolbox.profiling import Timer
 
 # Feature ing.:
@@ -27,12 +26,14 @@ DEFAULT_SUBSET_HIST = [
 ]
 
 
-def read_intervention_history(subset=DEFAULT_SUBSET_HIST):
+def read_intervention_history(debug=False, subset=DEFAULT_SUBSET_HIST):
     with Timer("Reading intervention_history.csv"):
         df = pd.read_csv(
             RAW_DATA_DIR / "intervention_history.csv",
             sep="|",
-            encoding="Latin-1")
+            encoding="Latin-1",
+            nrows=20000 if debug else None,
+        )
         dt_cols = [
             "DATE_SAISIE_RETOUR",
             "SCHEDULED_START_DATE",
@@ -122,9 +123,11 @@ class HomeServiceCleanedData:
         return df
 
     @staticmethod
-    def _build_features_str(df, modify_FORMULE=False,
-                            modify_INCIDENT_TYPE_NAME=False,
-                            ):
+    def _build_features_str(
+            df,
+            modify_FORMULE=False,
+            modify_INCIDENT_TYPE_NAME=False,
+    ):
         # Some Str cleaning:
 
         if modify_FORMULE:
@@ -148,7 +151,8 @@ class HomeServiceCleanedData:
 
             # --> ORIGINE_INCIDENT:
             # treat 'Fax' as nan due to only one register in test set
-            df['ORIGINE_INCIDENT'] = df['ORIGINE_INCIDENT'].replace('Fax', np.nan)
+            df['ORIGINE_INCIDENT'] = df['ORIGINE_INCIDENT'].replace(
+                'Fax', np.nan)
 
             # treat 'Répondeur', 'Mail', 'Internet' as one label: 'indirect_contact'
             # but still keep 'Courrier' as it is soooo mainstream, those people are old & odd.
@@ -175,17 +179,17 @@ class HomeServiceCleanedData:
             df = pd.concat(
                 [df.drop(columns=['INCIDENT_TYPE_NAME']), dftmp], axis=1)
 
-        # # Categorical features LabelBinarizer (equivalent to onehotencoding):
-        # msg = 'One Hot Encoding for CATEGORICAL_FEATURES with pd.get_dummies'
-        # with Timer(msg):
-        #     for col in CATEGORICAL_FEATURES:
-        #         df = pd.concat(
-        #             [
-        #                 pd.get_dummies(df[col], prefix=col),
-        #                 df.drop(columns=[col])
-        #             ],
-        #             axis=1,
-        #         )
+        # Categorical features LabelBinarizer (equivalent to onehotencoding):
+        msg = 'One Hot Encoding for SMALL_E_ONEHOT with pd.get_dummies'
+        with Timer(msg):
+            for col in SMALL_E_ONEHOT:
+                df = pd.concat(
+                    [
+                        pd.get_dummies(df[col], prefix=col),
+                        df.drop(columns=[col])
+                    ],
+                    axis=1,
+                )
 
         # Still to do, nlp on nlp_cols, but for the moment take the len of the
         # commentary
@@ -232,27 +236,30 @@ class HomeServiceCleanedData:
     def _build_features(self, df, include_hist=False):
         """Build features."""
 
-        # if self.include_hist:
-        #     with Timer("Add history features"):
-        #         dfhist = read_intervention_history()
-        #         for cl in CAT_FEATURES_LIST:
-        #             print('Engineering new categorical features for {}'.format(
-        #                 cl))
-        #             dfhist = self._build_features_cat(dfhist, cl)
-
-        #     df = df.merge(dfhist, how="left")
-
         with Timer("Building timestamp features"):
             df = self._build_features_datetime(df)
 
         with Timer("Building str features"):
             df = self._build_features_str(df)
 
-        with Timer("Encoding with HashingEncoder"):
-            label_cols = list(set(df.columns).intersection(set(LABEL_COLS)))
-            df.loc[:, label_cols] = df.loc[:, label_cols].astype(str)
-            encoder = ce.HashingEncoder(cols=label_cols, verbose=1)
-            df = encoder.fit_transform(df)
+        label_cols = list(set(df.columns).intersection(set(LABEL_COLS)))
+        df.loc[:, label_cols] = df.loc[:, label_cols].astype(str)
+
+        with Timer("Encoding with BackwardDifferenceEncoder"):
+            backward_diff_cols = list(
+                set(label_cols).intersection(
+                    set(HIGH_NUM_CAT + MEDIUM_NUM_CAT)))
+            bd_encoder = ce.backward_difference.BackwardDifferenceEncoder(
+                cols=backward_diff_cols, verbose=1)
+            df = bd_encoder.fit_transform(df)
+
+        # encoder = ce.HashingEncoder(cols=label_cols, verbose=1)
+        # df = encoder.fit_transform(df)
+
+        # Forgotten columns at the end, simple Binary Encoding:
+        with Timer("Encoding remaning one in Binary"):
+            bin_encoder = ce.Binary()
+            df = bin_encoder.fit_transform(df)
 
         to_drop = list(set(df.columns).intersection(set(TIMESTAMP_COLS)))
         df = df.drop(columns=to_drop)
@@ -283,19 +290,30 @@ class HomeServiceCleanedData:
     def generate_sets(self, drop_cols=DROPCOLS):
         """Generate cleaned sets."""
         with Timer("Gen clean trainset", True):
-            self.generate_single_set(
-                dataset="train", drop_cols=drop_cols)
+            self.generate_single_set(dataset="train", drop_cols=drop_cols)
 
         with Timer("Gen clean testset", True):
-            self.generate_single_set(
-                dataset="test", drop_cols=drop_cols)
+            self.generate_single_set(dataset="test", drop_cols=drop_cols)
 
-    # def add_history_to_cleaned(self):
-        # if self.include_hist:
-        #     for cat in CAT_FEATURES_LIST:
-        #         name1 = 'DELTA_INTERV_' + '_'.join(cat)
-        #         name2 = 'COUNT_' + '_'.join(cat)
-        #         df_test = df_test.merge(df_train[[name1, name2]], on=cat)
+    def add_history_to_cleaned(self):
+        # Test Cleaned Set:
+        dataset = 'test'
+        with Timer("Reading train set"):
+            pathdata = CLEANED_DATA_DIR / "{}{}_cleaned.parquet.gzip".format(
+                'debug_' if self.debug else '', dataset)
+            df = pd.read_parquet(pathdata)
+
+        with Timer("Add history features"):
+            dfhist = read_intervention_history(debug=self.debug)
+            for cl in CAT_FEATURES_LIST:
+                print('Engineering new categorical features for {}'.format(cl))
+                dfhist = self._build_features_cat(dfhist, cl)
+
+        for cat in CAT_FEATURES_LIST:
+            name1 = 'DELTA_INTERV_' + '_'.join(cat)
+            name2 = 'COUNT_' + '_'.join(cat)
+            df = df.merge(dfhist[[name1, name2]], on=cat)
+        __import__('IPython').embed()  # Enter Ipython
 
 
 class HomeServiceDataHandle:
@@ -356,7 +374,8 @@ class HomeServiceDataHandle:
 
         if replace_minus1:
             with Timer("Replacing -1 categorical by np.nan"):
-                lst_cols = list(set(df.columns.tolist()).intersection(LABEL_COLS))
+                lst_cols = list(
+                    set(df.columns.tolist()).intersection(LABEL_COLS))
                 for col in lst_cols:
                     df[col] = df[col].replace(-1, np.nan)
 
