@@ -11,7 +11,7 @@ from sklearn import model_selection, preprocessing
 from homeserv_inter.constants import (
     CATBOOST_FEATURES, CLEANED_DATA_DIR, DATA_DIR, DROPCOLS, HIGH_NUM_CAT,
     LABEL_COLS, LOW_IMPORTANCE_FEATURES, MEDIUM_NUM_CAT, NLP_COLS,
-    RAW_DATA_DIR, SEED, SMALL_E_ONEHOT, TIMESTAMP_COLS)
+    RAW_DATA_DIR, SEED, TIMESTAMP_COLS)
 from wax_toolbox.profiling import Timer
 
 # Feature ing.:
