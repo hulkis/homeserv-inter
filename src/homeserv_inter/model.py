@@ -89,7 +89,7 @@ class BaseModelHomeService(HomeServiceDataHandle, HyperParamsTuning):
         params["learning_rate"] = 0.04
 
         with Timer(msg, at_enter=True):
-            eval_hist = self.cv(params_model=params, nfolds=5)
+            eval_hist = self.cv(params_model=params, nfold=5)
 
         if "auc-mean" in eval_hist.keys():  # lightgbm
             score = max(eval_hist["auc-mean"])
@@ -180,7 +180,7 @@ class LgbHomeService(BaseModelHomeService):
 
     def cv(self,
            params_model=None,
-           nfolds=5,
+           nfold=5,
            num_boost_round=10000,
            early_stopping_rounds=100,
            generate_plot=False,
@@ -195,7 +195,7 @@ class LgbHomeService(BaseModelHomeService):
         eval_hist = lgb.cv(
             params=params_model,
             train_set=dtrain,
-            nfolds=nfolds,
+            nfold=nfold,
             verbose_eval=True,  # display the progress
             # display the standard deviation in progress, results are not affected
             show_stdv=True,
