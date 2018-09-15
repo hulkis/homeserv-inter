@@ -14,6 +14,7 @@ numpy
 xgboost==0.72.1
 lightgbm
 catboost
+category_encoders
 
 hyperopt
 networkx==1.11  # buggy hyperopt

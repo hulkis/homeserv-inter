@@ -1,4 +1,5 @@
 import re
+import category_encoders as ce
 
 import catboost as cgb
 import lightgbm as lgb
@@ -80,7 +81,7 @@ CAT_FEATURES_LIST = [['INSTANCE_ID'], ['RESOURCE_ID'],
 
 
 class HomeServiceCleanedData:
-    def __init__(self, debug=True, include_hist=False):
+    def __init__(self, debug=False, include_hist=False):
         self.debug = debug
         self.include_hist = include_hist
 
@@ -121,70 +122,73 @@ class HomeServiceCleanedData:
         return df
 
     @staticmethod
-    def _build_features_str(df):
+    def _build_features_str(df, modify_FORMULE=False,
+                            modify_INCIDENT_TYPE_NAME=False,
+                            ):
         # Some Str cleaning:
 
-        # --> FORMULE:
-        # treat 'SECURITE*' & 'SECURITE* 2V' & 'ESSENTIAL CLIENT' as the same
-        r = re.compile('SECURITE.*')
-        df['FORMULE'] = df['FORMULE'].str.replace(r, 'SECURITE')
+        if modify_FORMULE:
+            # --> FORMULE:
+            # treat 'SECURITE*' & 'SECURITE* 2V' & 'ESSENTIAL CLIENT' as the same
+            r = re.compile('SECURITE.*')
+            df['FORMULE'] = df['FORMULE'].str.replace(r, 'SECURITE')
 
-        # treat 'ESSENTIEL P2' & 'ESSENTIEL CLIENT' as the same
-        r = re.compile('ESSENTIEL.*')
-        df['FORMULE'] = df['FORMULE'].str.replace(r, 'ESSENTIEL')
+            # treat 'ESSENTIEL P2' & 'ESSENTIEL CLIENT' as the same
+            r = re.compile('ESSENTIEL.*')
+            df['FORMULE'] = df['FORMULE'].str.replace(r, 'ESSENTIEL')
 
-        # treat 'Sécurité Pack *' as the same
-        r = re.compile('Sécurité Pack.*')
-        df['FORMULE'] = df['FORMULE'].str.replace(r, 'Sécurité Pack')
+            # treat 'Sécurité Pack *' as the same
+            r = re.compile('Sécurité Pack.*')
+            df['FORMULE'] = df['FORMULE'].str.replace(r, 'Sécurité Pack')
 
-        # treat 'TRANQUILITE PRO .*' as nan due to only one register in test set
-        r = re.compile('TRANQUILLITE.*')
-        df['FORMULE'] = df['FORMULE'].replace(
-            r, np.nan)  # no str so that can be np.nan
+            # treat 'TRANQUILITE PRO .*' as nan due to only one register in test set
+            r = re.compile('TRANQUILLITE.*')
+            df['FORMULE'] = df['FORMULE'].replace(
+                r, np.nan)  # no str so that can be np.nan
 
-        # --> ORIGINE_INCIDENT:
-        # treat 'Fax' as nan due to only one register in test set
-        df['ORIGINE_INCIDENT'] = df['ORIGINE_INCIDENT'].replace('Fax', np.nan)
+            # --> ORIGINE_INCIDENT:
+            # treat 'Fax' as nan due to only one register in test set
+            df['ORIGINE_INCIDENT'] = df['ORIGINE_INCIDENT'].replace('Fax', np.nan)
 
-        # treat 'Répondeur', 'Mail', 'Internet' as one label: 'indirect_contact'
-        # but still keep 'Courrier' as it is soooo mainstream, those people are old & odd.
-        r = re.compile('(Répondeur)|(Mail)|(Internet)')
-        df['ORIGINE_INCIDENT'] = df['ORIGINE_INCIDENT'].replace(
-            r, 'indirect_contact')
+            # treat 'Répondeur', 'Mail', 'Internet' as one label: 'indirect_contact'
+            # but still keep 'Courrier' as it is soooo mainstream, those people are old & odd.
+            r = re.compile('(Répondeur)|(Mail)|(Internet)')
+            df['ORIGINE_INCIDENT'] = df['ORIGINE_INCIDENT'].replace(
+                r, 'indirect_contact')
 
-        # --> INCIDENT_TYPE_NAME
-        # Multi Label Binarize & one hot encoder INCIDENT_TYPE_NAME:
-        # i.e. from :            to:
-        # Dépannage                 1   0
-        # Entretien                 0   1
-        # Dépannage+Entretien       1   1
+        if modify_INCIDENT_TYPE_NAME:
+            # --> INCIDENT_TYPE_NAME
+            # Multi Label Binarize & one hot encoder INCIDENT_TYPE_NAME:
+            # i.e. from :            to:
+            # Dépannage                 1   0
+            # Entretien                 0   1
+            # Dépannage+Entretien       1   1
 
-        df['INCIDENT_TYPE_NAME'] = df['INCIDENT_TYPE_NAME'].str.split('+')
-        mlb = preprocessing.MultiLabelBinarizer()
-        df['INCIDENT_TYPE_NAME'] = list(
-            mlb.fit_transform(df['INCIDENT_TYPE_NAME']))
-        dftmp = pd.DataFrame(
-            index=df['INCIDENT_TYPE_NAME'].index,
-            data=df['INCIDENT_TYPE_NAME'].values.tolist()).add_prefix(
-                'INCIDENT_TYPE_NAME_label')
-        df = pd.concat(
-            [df.drop(columns=['INCIDENT_TYPE_NAME']), dftmp], axis=1)
+            df['INCIDENT_TYPE_NAME'] = df['INCIDENT_TYPE_NAME'].str.split('+')
+            mlb = preprocessing.MultiLabelBinarizer()
+            df['INCIDENT_TYPE_NAME'] = list(
+                mlb.fit_transform(df['INCIDENT_TYPE_NAME']))
+            dftmp = pd.DataFrame(
+                index=df['INCIDENT_TYPE_NAME'].index,
+                data=df['INCIDENT_TYPE_NAME'].values.tolist()).add_prefix(
+                    'INCIDENT_TYPE_NAME_label')
+            df = pd.concat(
+                [df.drop(columns=['INCIDENT_TYPE_NAME']), dftmp], axis=1)
 
-        # Categorical features LabelBinarizer (equivalent to onehotencoding):
-        msg = 'One Hot Encoding for CATEGORICAL_FEATURES with pd.get_dummies'
-        with Timer(msg):
-            for col in CATEGORICAL_FEATURES:
-                df = pd.concat(
-                    [
-                        pd.get_dummies(df[col], prefix=col),
-                        df.drop(columns=[col])
-                    ],
-                    axis=1,
-                )
+        # # Categorical features LabelBinarizer (equivalent to onehotencoding):
+        # msg = 'One Hot Encoding for CATEGORICAL_FEATURES with pd.get_dummies'
+        # with Timer(msg):
+        #     for col in CATEGORICAL_FEATURES:
+        #         df = pd.concat(
+        #             [
+        #                 pd.get_dummies(df[col], prefix=col),
+        #                 df.drop(columns=[col])
+        #             ],
+        #             axis=1,
+        #         )
 
         # Still to do, nlp on nlp_cols, but for the moment take the len of the
         # commentary
-        __import__('IPython').embed()  # Enter Ipython
         nlp_cols = list(set(df.columns).intersection(set(NLP_COLS)))
         for col in nlp_cols:
             newcol = '{}_len'.format(col)
@@ -228,15 +232,15 @@ class HomeServiceCleanedData:
     def _build_features(self, df, include_hist=False):
         """Build features."""
 
-        if self.include_hist:
-            with Timer("Add history features"):
-                dfhist = read_intervention_history()
-                for cl in CAT_FEATURES_LIST:
-                    print('Engineering new categorical features for {}'.format(
-                        cl))
-                    dfhist = self._build_features_cat(dfhist, cl)
+        # if self.include_hist:
+        #     with Timer("Add history features"):
+        #         dfhist = read_intervention_history()
+        #         for cl in CAT_FEATURES_LIST:
+        #             print('Engineering new categorical features for {}'.format(
+        #                 cl))
+        #             dfhist = self._build_features_cat(dfhist, cl)
 
-        df = df.merge(dfhist, how="left")
+        #     df = df.merge(dfhist, how="left")
 
         with Timer("Building timestamp features"):
             df = self._build_features_datetime(df)
@@ -244,19 +248,19 @@ class HomeServiceCleanedData:
         with Timer("Building str features"):
             df = self._build_features_str(df)
 
-        # Just encore the rest
-        with Timer("Encoding labels"):
+        with Timer("Encoding with HashingEncoder"):
             label_cols = list(set(df.columns).intersection(set(LABEL_COLS)))
-            label_encoder = LabelEncoderByColMissVal(columns=label_cols)
-            df = label_encoder.fit_transform(df)
+            df.loc[:, label_cols] = df.loc[:, label_cols].astype(str)
+            encoder = ce.HashingEncoder(cols=label_cols, verbose=1)
+            df = encoder.fit_transform(df)
 
-        to_drop = list(set(TIMESTAMP_COLS).intersection(set(df.columns)))
+        to_drop = list(set(df.columns).intersection(set(TIMESTAMP_COLS)))
         df = df.drop(columns=to_drop)
 
         return df
 
     # Methods to generate cleaned datas:
-    def generate_cleaned_single_set(self, dataset, drop_cols=DROPCOLS):
+    def generate_single_set(self, dataset, drop_cols=DROPCOLS):
         """Generate one cleaned set amon ['train', 'test']"""
         with Timer("Reading {} set".format(dataset)):
             df = pd.read_parquet(DATA_DIR / "{}.parquet.gzip".format(dataset))
@@ -267,7 +271,8 @@ class HomeServiceCleanedData:
         df = self._build_features(df)
 
         if drop_cols is not None:
-            df = df.drop(columns=drop_cols)
+            to_drop = list(set(df.columns).intersection(set(drop_cols)))
+            df = df.drop(columns=to_drop)
 
         savepath = CLEANED_DATA_DIR / "{}{}_cleaned.parquet.gzip".format(
             'debug_' if self.debug else '', dataset)
@@ -275,14 +280,14 @@ class HomeServiceCleanedData:
         with Timer("Saving into {}".format(savepath)):
             df.to_parquet(savepath, compression="gzip")
 
-    def generate_cleaned_sets(self, drop_cols=DROPCOLS):
+    def generate_sets(self, drop_cols=DROPCOLS):
         """Generate cleaned sets."""
         with Timer("Gen clean trainset", True):
-            self.generate_cleaned_single_set(
+            self.generate_single_set(
                 dataset="train", drop_cols=drop_cols)
 
         with Timer("Gen clean testset", True):
-            self.generate_cleaned_single_set(
+            self.generate_single_set(
                 dataset="test", drop_cols=drop_cols)
 
     # def add_history_to_cleaned(self):
