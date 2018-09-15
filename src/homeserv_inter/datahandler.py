@@ -187,36 +187,6 @@ CAT_FEATURES_LIST = [['INSTANCE_ID'], ['RESOURCE_ID'],
                      ['INSTANCE_ID', 'RESOURCE_ID']]
 
 
-def build_features(df, include_hist=False):
-    """Build features."""
-
-    if include_hist:
-        with Timer("Add history features"):
-            dfhist = read_intervention_history()
-            for cl in CAT_FEATURES_LIST:
-                print('Engineering new categorical features for {}'.format(cl))
-                dfhist = build_features_cat(dfhist, cl)
-
-        df = df.merge(dfhist, how="left")
-
-    with Timer("Building timestamp features"):
-        df = build_features_datetime(df)
-
-    with Timer("Building str features"):
-        df = build_features_str(df)
-
-    # Just encore the rest
-    with Timer("Encoding labels"):
-        label_cols = list(set(df.columns).intersection(set(LABEL_COLS)))
-        label_encoder = LabelEncoderByColMissVal(columns=label_cols)
-        df = label_encoder.fit_transform(df)
-
-    to_drop = list(set(TIMESTAMP_COLS).intersection(set(df.columns)))
-    df = df.drop(columns=to_drop)
-
-    return df
-
-
 def build_features_cat(df, filter, dfhist):
     def _mean_delta_interv(df):
         _df = df.dropna(
@@ -243,6 +213,36 @@ def build_features_cat(df, filter, dfhist):
     new_feature2 = df.groupby(filter).apply('count').reset_index() \
         .rename({0: 'COUNT_' + '_'.join(filter)})
     df = df.merge(new_feature1, on=filter).merge(new_feature2, on=filter)
+
+    return df
+
+
+def build_features(df, include_hist=False):
+    """Build features."""
+
+    if include_hist:
+        with Timer("Add history features"):
+            dfhist = read_intervention_history()
+            for cl in CAT_FEATURES_LIST:
+                print('Engineering new categorical features for {}'.format(cl))
+                dfhist = build_features_cat(dfhist, cl)
+
+        df = df.merge(dfhist, how="left")
+
+    with Timer("Building timestamp features"):
+        df = build_features_datetime(df)
+
+    with Timer("Building str features"):
+        df = build_features_str(df)
+
+    # Just encore the rest
+    with Timer("Encoding labels"):
+        label_cols = list(set(df.columns).intersection(set(LABEL_COLS)))
+        label_encoder = LabelEncoderByColMissVal(columns=label_cols)
+        df = label_encoder.fit_transform(df)
+
+    to_drop = list(set(TIMESTAMP_COLS).intersection(set(df.columns)))
+    df = df.drop(columns=to_drop)
 
     return df
 
