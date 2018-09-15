@@ -234,15 +234,26 @@ class HomeServiceCleanedData:
         df.loc[:, label_cols] = df.loc[:, label_cols].astype(str)
 
         with Timer("Encoding with BackwardDifferenceEncoder"):
-            backward_diff_cols = list(
-                set(label_cols).intersection(
-                    set(HIGH_NUM_CAT + MEDIUM_NUM_CAT)))
-            bd_encoder = ce.backward_difference.BackwardDifferenceEncoder(
-                cols=backward_diff_cols, verbose=1)
-            df = bd_encoder.fit_transform(df)
+            # backward_diff_cols = list(
+            #     set(label_cols).intersection(
+            #         set(HIGH_NUM_CAT + MEDIUM_NUM_CAT)))
+            # bd_encoder = ce.backward_difference.BackwardDifferenceEncoder(
+            #     cols=backward_diff_cols, verbose=1)
+            # dftmp = bd_encoder.fit_transform(df)
 
-        # encoder = ce.HashingEncoder(cols=label_cols, verbose=1)
-        # df = encoder.fit_transform(df)
+            # Gives memory error
+            pass
+
+        with Timer("Encoding with HashingEncoder"):
+            hash_cols = list(
+                set(label_cols).intersection(set(HIGH_NUM_CAT)))
+            hash_encoder = ce.HashingEncoder(
+                cols=hash_cols, n_components=40, verbose=1)
+            dftmp = hash_encoder.fit_transform(df)
+            newcols = dftmp.columns.difference(df.columns)
+            dftmp = dftmp[newcols]
+            dftmp.columns = 'hash_' + dftmp.columns
+            df = pd.concat([df, dftmp], axis=1)
 
         # Forgotten columns at the end, simple Binary Encoding:
         with Timer("Encoding remaning one in Binary"):
