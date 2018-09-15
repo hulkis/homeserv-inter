@@ -221,7 +221,7 @@ class HomeServiceCleanedData:
 
         return df
 
-    def _build_features(self, df, include_hist=False):
+    def _build_features(self, df, hash_encode=False, include_hist=False):
         """Build features."""
 
         with Timer("Building timestamp features"):
@@ -233,28 +233,27 @@ class HomeServiceCleanedData:
         label_cols = list(set(df.columns).intersection(set(LABEL_COLS)))
         df.loc[:, label_cols] = df.loc[:, label_cols].astype(str)
 
-        with Timer("Encoding with BackwardDifferenceEncoder"):
-            # backward_diff_cols = list(
-            #     set(label_cols).intersection(
-            #         set(HIGH_NUM_CAT + MEDIUM_NUM_CAT)))
-            # bd_encoder = ce.backward_difference.BackwardDifferenceEncoder(
-            #     cols=backward_diff_cols, verbose=1)
-            # dftmp = bd_encoder.fit_transform(df)
+        # # Gives memory error
+        # with Timer("Encoding with BackwardDifferenceEncoder"):
+        #     backward_diff_cols = list(
+        #         set(label_cols).intersection(
+        #             set(HIGH_NUM_CAT + MEDIUM_NUM_CAT)))
+        #     bd_encoder = ce.backward_difference.BackwardDifferenceEncoder(
+        #         cols=backward_diff_cols, verbose=1)
+        #     dftmp = bd_encoder.fit_transform(df)
 
-            # Gives memory error
-            pass
-
-        with Timer("Encoding with HashingEncoder"):
-            for col in ['RESOURCE_ID', 'RUE', 'PARTY_ID_OCC', 'VILLE']:
-                hash_cols = list(
-                    set(label_cols).intersection(set([col])))
-                hash_encoder = ce.HashingEncoder(
-                    cols=hash_cols, n_components=15, verbose=1)
-                dftmp = hash_encoder.fit_transform(df)
-                newcols = dftmp.columns.difference(df.columns)
-                dftmp = dftmp[newcols]
-                dftmp.columns = 'hash_{}_'.format(col) + dftmp.columns
-                df = pd.concat([df, dftmp], axis=1)
+        if hash_encode:
+            with Timer("Encoding with HashingEncoder"):
+                for col in ['RESOURCE_ID', 'RUE', 'PARTY_ID_OCC', 'VILLE']:
+                    hash_cols = list(
+                        set(label_cols).intersection(set([col])))
+                    hash_encoder = ce.HashingEncoder(
+                        cols=hash_cols, n_components=15, verbose=1)
+                    dftmp = hash_encoder.fit_transform(df)
+                    newcols = dftmp.columns.difference(df.columns)
+                    dftmp = dftmp[newcols]
+                    dftmp.columns = 'hash_{}_'.format(col) + dftmp.columns
+                    df = pd.concat([df, dftmp], axis=1)
 
         # Forgotten columns at the end, simple Binary Encoding:
         with Timer("Encoding remaning one in Binary"):
