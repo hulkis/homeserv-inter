@@ -83,11 +83,11 @@ CAT_FEATURES_LIST = [['INSTANCE_ID'], ['RESOURCE_ID'],
 
 class HomeServiceCleanedData:
     def __init__(self, debug=False,
-                 bin_encode=True,
+                 label_encode=True,
                  hash_encode=False,
                  include_hist=False):
         self.debug = debug
-        self.bin_encode = bin_encode
+        self.label_encode = label_encode
         self.hash_encode = hash_encode
         self.include_hist = include_hist
 
@@ -260,11 +260,14 @@ class HomeServiceCleanedData:
                     dftmp.columns = 'hash_{}_'.format(col) + dftmp.columns
                     df = pd.concat([df, dftmp], axis=1)
 
-        if self.bin_encode:
+        if self.label_encode:
             # Forgotten columns at the end, simple Binary Encoding:
-            with Timer("Encoding remaning one in Binary"):
-                bin_encoder = ce.BinaryEncoder()
-                df = bin_encoder.fit_transform(df)
+            with Timer("Encoding remaning ones in as LabelEncoder"):
+                other_cols = df.columns.difference(
+                    df._get_numeric_data().columns).tolist()
+                le = preprocessing.LabelEncoder()
+                for col in other_cols:
+                    df.loc[:, col] = le.fit_transform(df[col])
 
         to_drop = list(set(df.columns).intersection(set(TIMESTAMP_COLS)))
         df = df.drop(columns=to_drop)
