@@ -81,6 +81,14 @@ CAT_FEATURES_LIST = [['INSTANCE_ID'], ['RESOURCE_ID'],
                      ['INSTANCE_ID', 'RESOURCE_ID']]
 
 
+def get_describe_value_counts_cat(dataset='test'):
+    dtest = pd.read_parquet(DATA_DIR / "{}.parquet.gzip".format(dataset))
+    df = pd.DataFrame()
+    for col in LABEL_COLS:
+        df[col] = dtest[col].value_counts().describe()
+    return df
+
+
 class HomeServiceCleanedData:
     def __init__(self,
                  debug=False,
@@ -191,7 +199,7 @@ class HomeServiceCleanedData:
             df['RUE'] = df['RUE'].replace(to_replace, 'KitKatIsGood')
 
         with Timer('Replacing rare RESOURCE_ID'):
-            to_replace = (df['RESOURCE_ID'].value_counts() <= 10).index
+            to_replace = (df['RESOURCE_ID'].value_counts() <= 25).index
             df['RESOURCE_ID'] = df['RESOURCE_ID'].replace(to_replace, -1)
 
         with Timer('Replacing rare VILLE'):
@@ -200,18 +208,20 @@ class HomeServiceCleanedData:
 
         with Timer('Replacing rare MARQUE_LIB'):
             to_replace = (df['MARQUE_LIB'].value_counts() <= 25).index
-            df['MARQUE_LIB'] = df['MARQUE_LIB'].replace(to_replace, 'BrandOfChocolat')
+            df['MARQUE_LIB'] = df['MARQUE_LIB'].replace(
+                to_replace, 'BrandOfChocolat')
 
         with Timer('Replacing rare TYPE_VOIE'):
             to_replace = (df['TYPE_VOIE'].value_counts() <= 25).index
-            df['TYPE_VOIE'] = df['TYPE_VOIE'].replace(to_replace, 'Stairway to hell')
+            df['TYPE_VOIE'] = df['TYPE_VOIE'].replace(to_replace,
+                                                      'Stairway to hell')
 
         with Timer('Replacing rare OPTION'):
             to_replace = (df['OPTION'].value_counts() <= 5).index
             df['OPTION'] = df['OPTION'].replace(to_replace, 'NoNeedForIt')
 
         with Timer('Replacing rare CODE_GEN_EQUIPEMENT'):
-            to_replace = (df['CODE_GEN_EQUIPEMENT'].value_counts() <= 5).index
+            to_replace = (df['CODE_GEN_EQUIPEMENT'].value_counts() <= 7).index
             df['CODE_GEN_EQUIPEMENT'] = df['CODE_GEN_EQUIPEMENT'].replace(
                 to_replace, 'SuperCode')
 
