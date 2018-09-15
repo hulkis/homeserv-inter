@@ -76,10 +76,14 @@ for col in NLP_COLS:
 LABEL_COLS += NUM_COLS_CATEGORICAL
 
 
-HIGH_NUM_CAT = ['RUE', 'RESOURCE_ID',
-                'INSTANCE_ID', 'LOCATION_ID',
-                'PARTY_ID_OCC', 'VILLE',
-                'CONTRACT_NUMBER', 'LOCATION_ID',
+HIGH_NUM_CAT = ['RUE',
+                'RESOURCE_ID',
+                # 'INSTANCE_ID',
+                'LOCATION_ID',
+                # 'PARTY_ID_OCC',
+                'VILLE',
+                # 'CONTRACT_NUMBER',
+                'LOCATION_ID',
                 ]
 
 MEDIUM_NUM_CAT = ['MARQUE_LIB', 'TYPE_VOIE', 'OPTION', 'CODE_GEN_EQUIPEMENT']

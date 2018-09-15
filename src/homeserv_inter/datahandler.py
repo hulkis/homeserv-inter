@@ -82,7 +82,8 @@ CAT_FEATURES_LIST = [['INSTANCE_ID'], ['RESOURCE_ID'],
 
 
 class HomeServiceCleanedData:
-    def __init__(self, debug=False,
+    def __init__(self,
+                 debug=False,
                  label_encode=True,
                  hash_encode=False,
                  include_hist=False):
@@ -184,6 +185,36 @@ class HomeServiceCleanedData:
             df = pd.concat(
                 [df.drop(columns=['INCIDENT_TYPE_NAME']), dftmp], axis=1)
 
+        # Some value counts and rewrite those too rare:
+        with Timer('Replacing rare RUE'):
+            to_replace = (df['RUE'].value_counts() <= 10).index
+            df['RUE'] = df['RUE'].replace(to_replace, 'KitKatIsGood')
+
+        with Timer('Replacing rare RESOURCE_ID'):
+            to_replace = (df['RESOURCE_ID'].value_counts() <= 10).index
+            df['RESOURCE_ID'] = df['RESOURCE_ID'].replace(to_replace, -1)
+
+        with Timer('Replacing rare VILLE'):
+            to_replace = (df['VILLE'].value_counts() <= 10).index
+            df['VILLE'] = df['VILLE'].replace(to_replace, 'WonderLand')
+
+        with Timer('Replacing rare MARQUE_LIB'):
+            to_replace = (df['MARQUE_LIB'].value_counts() <= 25).index
+            df['MARQUE_LIB'] = df['MARQUE_LIB'].replace(to_replace, 'BrandOfChocolat')
+
+        with Timer('Replacing rare TYPE_VOIE'):
+            to_replace = (df['TYPE_VOIE'].value_counts() <= 25).index
+            df['TYPE_VOIE'] = df['TYPE_VOIE'].replace(to_replace, 'Stairway to hell')
+
+        with Timer('Replacing rare OPTION'):
+            to_replace = (df['OPTION'].value_counts() <= 5).index
+            df['OPTION'] = df['OPTION'].replace(to_replace, 'NoNeedForIt')
+
+        with Timer('Replacing rare CODE_GEN_EQUIPEMENT'):
+            to_replace = (df['CODE_GEN_EQUIPEMENT'].value_counts() <= 5).index
+            df['CODE_GEN_EQUIPEMENT'] = df['CODE_GEN_EQUIPEMENT'].replace(
+                to_replace, 'SuperCode')
+
         # Still to do, nlp on nlp_cols, but for the moment take the len of the
         # commentary
         nlp_cols = list(set(df.columns).intersection(set(NLP_COLS)))
@@ -250,8 +281,7 @@ class HomeServiceCleanedData:
         if self.hash_encode:
             with Timer("Encoding with HashingEncoder"):
                 for col in ['RESOURCE_ID', 'RUE', 'PARTY_ID_OCC', 'VILLE']:
-                    hash_cols = list(
-                        set(label_cols).intersection(set([col])))
+                    hash_cols = list(set(label_cols).intersection(set([col])))
                     hash_encoder = ce.HashingEncoder(
                         cols=hash_cols, n_components=15, verbose=1)
                     dftmp = hash_encoder.fit_transform(df)
