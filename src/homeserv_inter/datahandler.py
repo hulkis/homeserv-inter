@@ -125,8 +125,8 @@ class HomeServiceCleanedData:
     @staticmethod
     def _build_features_str(
             df,
-            modify_FORMULE=False,
-            modify_INCIDENT_TYPE_NAME=False,
+            modify_FORMULE=True,
+            modify_INCIDENT_TYPE_NAME=True,
     ):
         # Some Str cleaning:
 
@@ -178,18 +178,6 @@ class HomeServiceCleanedData:
                     'INCIDENT_TYPE_NAME_label')
             df = pd.concat(
                 [df.drop(columns=['INCIDENT_TYPE_NAME']), dftmp], axis=1)
-
-        # Categorical features LabelBinarizer (equivalent to onehotencoding):
-        msg = 'One Hot Encoding for SMALL_E_ONEHOT with pd.get_dummies'
-        with Timer(msg):
-            for col in SMALL_E_ONEHOT:
-                df = pd.concat(
-                    [
-                        pd.get_dummies(df[col], prefix=col),
-                        df.drop(columns=[col])
-                    ],
-                    axis=1,
-                )
 
         # Still to do, nlp on nlp_cols, but for the moment take the len of the
         # commentary
