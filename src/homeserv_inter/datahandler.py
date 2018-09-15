@@ -187,7 +187,7 @@ CAT_FEATURES_LIST = [['INSTANCE_ID'], ['RESOURCE_ID'],
                      ['INSTANCE_ID', 'RESOURCE_ID']]
 
 
-def build_features_cat(df, filter, dfhist):
+def build_features_cat(df, filter):
     def _mean_delta_interv(df):
         _df = df.dropna(
             subset=[
@@ -227,7 +227,7 @@ def build_features(df, include_hist=False):
                 print('Engineering new categorical features for {}'.format(cl))
                 dfhist = build_features_cat(dfhist, cl)
 
-        df = df.merge(dfhist, how="left")
+    df = df.merge(dfhist, how="left")
 
     with Timer("Building timestamp features"):
         df = build_features_datetime(df)
