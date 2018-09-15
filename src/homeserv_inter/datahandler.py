@@ -193,38 +193,6 @@ class HomeServiceCleanedData:
             df = pd.concat(
                 [df.drop(columns=['INCIDENT_TYPE_NAME']), dftmp], axis=1)
 
-        # Some value counts and rewrite those too rare:
-        with Timer('Replacing rare RUE'):
-            to_replace = (df['RUE'].value_counts() <= 10).index
-            df['RUE'] = df['RUE'].replace(to_replace, 'KitKatIsGood')
-
-        with Timer('Replacing rare RESOURCE_ID'):
-            to_replace = (df['RESOURCE_ID'].value_counts() <= 25).index
-            df['RESOURCE_ID'] = df['RESOURCE_ID'].replace(to_replace, -1)
-
-        with Timer('Replacing rare VILLE'):
-            to_replace = (df['VILLE'].value_counts() <= 10).index
-            df['VILLE'] = df['VILLE'].replace(to_replace, 'WonderLand')
-
-        with Timer('Replacing rare MARQUE_LIB'):
-            to_replace = (df['MARQUE_LIB'].value_counts() <= 25).index
-            df['MARQUE_LIB'] = df['MARQUE_LIB'].replace(
-                to_replace, 'BrandOfChocolat')
-
-        with Timer('Replacing rare TYPE_VOIE'):
-            to_replace = (df['TYPE_VOIE'].value_counts() <= 25).index
-            df['TYPE_VOIE'] = df['TYPE_VOIE'].replace(to_replace,
-                                                      'Stairway to hell')
-
-        with Timer('Replacing rare OPTION'):
-            to_replace = (df['OPTION'].value_counts() <= 5).index
-            df['OPTION'] = df['OPTION'].replace(to_replace, 'NoNeedForIt')
-
-        with Timer('Replacing rare CODE_GEN_EQUIPEMENT'):
-            to_replace = (df['CODE_GEN_EQUIPEMENT'].value_counts() <= 7).index
-            df['CODE_GEN_EQUIPEMENT'] = df['CODE_GEN_EQUIPEMENT'].replace(
-                to_replace, 'SuperCode')
-
         # Still to do, nlp on nlp_cols, but for the moment take the len of the
         # commentary
         nlp_cols = list(set(df.columns).intersection(set(NLP_COLS)))
@@ -287,6 +255,43 @@ class HomeServiceCleanedData:
         #     bd_encoder = ce.backward_difference.BackwardDifferenceEncoder(
         #         cols=backward_diff_cols, verbose=1)
         #     dftmp = bd_encoder.fit_transform(df)
+
+        def _replace_values(col, threshold):
+            with Timer('Replacing rare {}'.format(col)):
+                if df[col].dtype == int:
+                    le = preprocessing.LabelEncoder()
+                    df.loc[:, col] = le.fit_transform(df[col])
+                to_replace = (df[col].value_counts() <= threshold).index
+                df[col] = df[col].replace(to_replace, -1)
+
+        lst_calls = [
+            {
+                'col': 'RUE',
+                'threshold': 10
+            },
+            {
+                'col': 'RESOURCE_ID',
+                'threshold': 25
+            },
+            {
+                'col': 'VILLE',
+                'threshold': 10
+            },
+            {
+                'col': 'MARQUE_LIB',
+                'threshold': 25
+            },
+            {
+                'col': 'OPTION',
+                'threshold': 5
+            },
+            {
+                'col': 'CODE_GEN_EQUIPEMENT',
+                'threshold': 7
+            },
+        ]
+        for kwargs in lst_calls:
+            _replace_values(**kwargs)
 
         if self.hash_encode:
             with Timer("Encoding with HashingEncoder"):
