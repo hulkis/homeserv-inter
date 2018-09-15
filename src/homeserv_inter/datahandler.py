@@ -290,10 +290,10 @@ class HomeServiceCleanedData:
 
         if self.hash_encode:
             with Timer("Encoding with HashingEncoder"):
-                for col in ['RESOURCE_ID', 'RUE', 'PARTY_ID_OCC', 'VILLE']:
+                for col in ['RESOURCE_ID', 'RUE', 'VILLE']:
                     hash_cols = list(set(label_cols).intersection(set([col])))
                     hash_encoder = ce.HashingEncoder(
-                        cols=hash_cols, n_components=15, verbose=1)
+                        cols=hash_cols, n_components=8, verbose=1)
                     dftmp = hash_encoder.fit_transform(df)
                     newcols = dftmp.columns.difference(df.columns)
                     dftmp = dftmp[newcols]
