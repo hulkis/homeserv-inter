@@ -184,6 +184,7 @@ class HomeServiceCleanedData:
 
         # Still to do, nlp on nlp_cols, but for the moment take the len of the
         # commentary
+        __import__('IPython').embed()  # Enter Ipython
         nlp_cols = list(set(df.columns).intersection(set(NLP_COLS)))
         for col in nlp_cols:
             newcol = '{}_len'.format(col)
@@ -268,27 +269,23 @@ class HomeServiceCleanedData:
         if drop_cols is not None:
             df = df.drop(columns=drop_cols)
 
-        return df
+        savepath = CLEANED_DATA_DIR / "{}{}_cleaned.parquet.gzip".format(
+            'debug_' if self.debug else '', dataset)
+
+        with Timer("Saving into {}".format(savepath)):
+            df.to_parquet(savepath, compression="gzip")
 
     def generate_cleaned_sets(self, drop_cols=DROPCOLS):
         """Generate cleaned sets."""
         with Timer("Gen clean trainset", True):
-            df_train = self.generate_cleaned_single_set(
-                dataset="train",
-                drop_cols=drop_cols)
-
-        savepath = CLEANED_DATA_DIR / "{}_cleaned.parquet.gzip".format('train')
-        with Timer("Saving into {}".format(savepath)):
-            df_train.to_parquet(savepath, compression="gzip")
+            self.generate_cleaned_single_set(
+                dataset="train", drop_cols=drop_cols)
 
         with Timer("Gen clean testset", True):
-            df_test = self.generate_cleaned_single_set(
+            self.generate_cleaned_single_set(
                 dataset="test", drop_cols=drop_cols)
 
-        savepath = CLEANED_DATA_DIR / "{}_cleaned.parquet.gzip".format('test')
-        with Timer("Saving into {}".format(savepath)):
-            df_test.to_parquet(savepath, compression="gzip")
-
+    # def add_history_to_cleaned(self):
         # if self.include_hist:
         #     for cat in CAT_FEATURES_LIST:
         #         name1 = 'DELTA_INTERV_' + '_'.join(cat)
