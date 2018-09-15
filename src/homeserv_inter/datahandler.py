@@ -247,15 +247,9 @@ class HomeServiceCleanedData:
         label_cols = list(set(df.columns).intersection(set(LABEL_COLS)))
         df.loc[:, label_cols] = df.loc[:, label_cols].astype(str)
 
-        # # Gives memory error
-        # with Timer("Encoding with BackwardDifferenceEncoder"):
-        #     backward_diff_cols = list(
-        #         set(label_cols).intersection(
-        #             set(HIGH_NUM_CAT + MEDIUM_NUM_CAT)))
-        #     bd_encoder = ce.backward_difference.BackwardDifferenceEncoder(
-        #         cols=backward_diff_cols, verbose=1)
-        #     dftmp = bd_encoder.fit_transform(df)
-
+        # Choice to encode automatically due to huge dataset, and it is
+        # faster to compare integers than string.
+        # Also faster I gess to hash an integer
         def _replace_values(col, threshold):
             with Timer('Replacing rare {}'.format(col)):
                 if df[col].dtype == int:
