@@ -344,7 +344,7 @@ class HomeServiceDataHandle:
         return df, catboost_features
 
     # Methods to get cleaned datas:
-    def _get_cleaned_single_set(self, dataset="train"):
+    def _get_cleaned_single_set(self, dataset="train", replace_minus1=False):
         with Timer("Reading train set"):
             pathdata = CLEANED_DATA_DIR / "{}_cleaned.parquet.gzip".format(
                 dataset)
@@ -354,10 +354,20 @@ class HomeServiceDataHandle:
                     n=10000, random_state=SEED).dropna(
                         axis=1, how="all")
 
-        with Timer("Replacing -1 categorical by np.nan"):
-            lst_cols = list(set(df.columns.tolist()).intersection(LABEL_COLS))
-            for col in lst_cols:
-                df[col] = df[col].replace(-1, np.nan)
+        if replace_minus1:
+            with Timer("Replacing -1 categorical by np.nan"):
+                lst_cols = list(set(df.columns.tolist()).intersection(LABEL_COLS))
+                for col in lst_cols:
+                    df[col] = df[col].replace(-1, np.nan)
+
+        # Consistency, always sort columns with target at the end:
+        cols = df.columns.tolist()
+        if 'target' in df.columns:
+            cols.remove('target')
+        sorted_cols = sorted(cols)
+        if 'target' in df.columns:
+            sorted_cols += ['target']
+            df = df.loc[:, sorted_cols]
 
         return df
 
