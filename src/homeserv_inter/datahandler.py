@@ -245,15 +245,16 @@ class HomeServiceCleanedData:
             pass
 
         with Timer("Encoding with HashingEncoder"):
-            hash_cols = list(
-                set(label_cols).intersection(set(HIGH_NUM_CAT)))
-            hash_encoder = ce.HashingEncoder(
-                cols=hash_cols, n_components=40, verbose=1)
-            dftmp = hash_encoder.fit_transform(df)
-            newcols = dftmp.columns.difference(df.columns)
-            dftmp = dftmp[newcols]
-            dftmp.columns = 'hash_' + dftmp.columns
-            df = pd.concat([df, dftmp], axis=1)
+            for col in ['RESOURCE_ID', 'RUE', 'PARTY_ID_OCC', 'VILLE']:
+                hash_cols = list(
+                    set(label_cols).intersection(set([col])))
+                hash_encoder = ce.HashingEncoder(
+                    cols=hash_cols, n_components=15, verbose=1)
+                dftmp = hash_encoder.fit_transform(df)
+                newcols = dftmp.columns.difference(df.columns)
+                dftmp = dftmp[newcols]
+                dftmp.columns = 'hash_{}_'.format(col) + dftmp.columns
+                df = pd.concat([df, dftmp], axis=1)
 
         # Forgotten columns at the end, simple Binary Encoding:
         with Timer("Encoding remaning one in Binary"):
