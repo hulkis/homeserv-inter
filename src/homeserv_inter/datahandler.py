@@ -359,10 +359,11 @@ class HomeServiceDataHandle:
 
         # Convert into integers without nans:
         for col in catboost_features:
-            maxcol = df[col].max()
-            maxcol = maxcol if maxcol is not np.nan else 0  # case only nan
-            df.loc[:, col] = df.loc[:, col].fillna(maxcol)
-            df.loc[:, col] = df[col].astype(int)
+            if (df[col].dtype <= np.integer) or (df[col].dtype <= np.float):
+                maxcol = df[col].max()
+                maxcol = maxcol if maxcol is not np.nan else 0  # case only nan
+                df.loc[:, col] = df.loc[:, col].fillna(maxcol)
+                df.loc[:, col] = df[col].astype(int)
 
         return df, catboost_features
 
